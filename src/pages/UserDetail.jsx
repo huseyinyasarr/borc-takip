@@ -302,6 +302,9 @@ const UserDetail = () => {
                   Harcama Açıklaması
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Alışveriş Tarihi
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Toplam Tutar
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -347,6 +350,11 @@ const UserDetail = () => {
                             : detail.storeName)
                         : detail.description || '-'}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {detail.purchaseDate
+                        ? formatDateLong(detail.purchaseDate)
+                        : '-'}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {formatCurrency(detail.totalAmount)}
                     </td>
@@ -384,15 +392,15 @@ const UserDetail = () => {
                     TOPLAM
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                    -
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                     {formatCurrency(
                       purchaseDetails.reduce(
                         (sum, d) => sum + d.totalAmount,
                         0
                       )
                     )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                    -
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                     -

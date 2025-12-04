@@ -36,6 +36,14 @@ export const getPurchases = async () => {
         firstInstallmentDate = new Date(firstInstallmentDate)
       }
 
+      // Alışveriş tarihini Date'e çevir (sadece görüntüleme için)
+      let purchaseDate = data.purchaseDate
+      if (purchaseDate?.toDate) {
+        purchaseDate = purchaseDate.toDate()
+      } else if (purchaseDate) {
+        purchaseDate = new Date(purchaseDate)
+      }
+
       let createdAt = data.createdAt
       if (createdAt?.toDate) {
         createdAt = createdAt.toDate()
@@ -47,6 +55,7 @@ export const getPurchases = async () => {
         id: doc.id,
         ...data,
         firstInstallmentDate,
+        purchaseDate,
         createdAt
       })
     })
@@ -79,6 +88,13 @@ export const getPurchasesByUserId = async (userId) => {
         firstInstallmentDate = new Date(firstInstallmentDate)
       }
 
+      let purchaseDate = data.purchaseDate
+      if (purchaseDate?.toDate) {
+        purchaseDate = purchaseDate.toDate()
+      } else if (purchaseDate) {
+        purchaseDate = new Date(purchaseDate)
+      }
+
       let createdAt = data.createdAt
       if (createdAt?.toDate) {
         createdAt = createdAt.toDate()
@@ -90,6 +106,7 @@ export const getPurchasesByUserId = async (userId) => {
         id: doc.id,
         ...data,
         firstInstallmentDate,
+        purchaseDate,
         createdAt
       })
     })
@@ -110,6 +127,12 @@ export const createPurchase = async (purchaseData) => {
       ? Timestamp.fromDate(purchaseData.firstInstallmentDate)
       : Timestamp.fromDate(new Date(purchaseData.firstInstallmentDate))
 
+    const purchaseDateTimestamp = purchaseData.purchaseDate
+      ? (purchaseData.purchaseDate instanceof Date
+          ? Timestamp.fromDate(purchaseData.purchaseDate)
+          : Timestamp.fromDate(new Date(purchaseData.purchaseDate)))
+      : null
+
     const docRef = await addDoc(collection(db, PURCHASES_COLLECTION), {
       userId: purchaseData.userId,
       cardId: purchaseData.cardId || null, // Kart ID'si (opsiyonel, geriye dönük uyumluluk için)
@@ -118,6 +141,7 @@ export const createPurchase = async (purchaseData) => {
       totalAmount: parseFloat(purchaseData.totalAmount),
       installmentCount: parseInt(purchaseData.installmentCount),
       firstInstallmentDate: firstInstallmentTimestamp,
+      purchaseDate: purchaseDateTimestamp,
       currency: purchaseData.currency || 'TRY',
       createdAt: Timestamp.now()
     })
@@ -149,6 +173,12 @@ export const updatePurchase = async (purchaseId, purchaseData) => {
       updateData.firstInstallmentDate = updateData.firstInstallmentDate instanceof Date
         ? Timestamp.fromDate(updateData.firstInstallmentDate)
         : Timestamp.fromDate(new Date(updateData.firstInstallmentDate))
+    }
+
+    if (updateData.purchaseDate) {
+      updateData.purchaseDate = updateData.purchaseDate instanceof Date
+        ? Timestamp.fromDate(updateData.purchaseDate)
+        : Timestamp.fromDate(new Date(updateData.purchaseDate))
     }
 
     await updateDoc(purchaseRef, updateData)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+  import { useState, useEffect, useRef } from 'react'
 import html2canvas from 'html2canvas'
 import { getUsers } from '../services/userService'
 import { getPurchases } from '../services/purchaseService'
@@ -563,6 +563,9 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                             Harcama Açıklaması
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Alışveriş Tarihi
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Toplam Tutar
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -608,6 +611,11 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                                       : detail.storeName)
                                   : detail.description || '-'}
                               </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {detail.purchaseDate
+                                  ? formatDateLong(detail.purchaseDate)
+                                  : '-'}
+                              </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                 {formatCurrency(detail.totalAmount)}
                               </td>
@@ -643,6 +651,9 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                           <tr>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                               TOPLAM
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                              -
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                               {formatCurrency(

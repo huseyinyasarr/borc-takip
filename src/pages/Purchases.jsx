@@ -31,6 +31,8 @@ const Purchases = () => {
     productName: '',
     totalAmount: '',
     installmentCount: '',
+    // Bilgi amaçlı alışveriş tarihi (logic'te kullanılmıyor)
+    purchaseDate: format(new Date(), 'yyyy-MM-dd'),
     firstInstallmentDate: format(new Date(), 'yyyy-MM-dd'),
     currency: 'TRY'
   })
@@ -119,6 +121,9 @@ const Purchases = () => {
           productName: formData.productName?.trim() || '',
           totalAmount: formData.totalAmount,
           installmentCount: formData.installmentCount,
+          purchaseDate: formData.purchaseDate
+            ? new Date(formData.purchaseDate)
+            : null,
           firstInstallmentDate: new Date(formData.firstInstallmentDate),
           currency: formData.currency
         })
@@ -132,6 +137,9 @@ const Purchases = () => {
           productName: formData.productName?.trim() || '',
           totalAmount: formData.totalAmount,
           installmentCount: formData.installmentCount,
+          purchaseDate: formData.purchaseDate
+            ? new Date(formData.purchaseDate)
+            : null,
           firstInstallmentDate: new Date(formData.firstInstallmentDate),
           currency: formData.currency
         })
@@ -154,6 +162,7 @@ const Purchases = () => {
       productName: '',
       totalAmount: '',
       installmentCount: '',
+      purchaseDate: format(new Date(), 'yyyy-MM-dd'),
       firstInstallmentDate: format(new Date(), 'yyyy-MM-dd'),
       currency: 'TRY'
     })
@@ -171,6 +180,9 @@ const Purchases = () => {
       productName: purchase.productName || '',
       totalAmount: purchase.totalAmount.toString(),
       installmentCount: purchase.installmentCount.toString(),
+      purchaseDate: purchase.purchaseDate
+        ? format(new Date(purchase.purchaseDate), 'yyyy-MM-dd')
+        : format(new Date(purchase.firstInstallmentDate), 'yyyy-MM-dd'),
       firstInstallmentDate: format(
         new Date(purchase.firstInstallmentDate),
         'yyyy-MM-dd'
@@ -480,6 +492,19 @@ const Purchases = () => {
                       )}
                     </p>
                   )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Alışveriş Tarihi
+                </label>
+                <input
+                  type="date"
+                  name="purchaseDate"
+                  value={formData.purchaseDate}
+                  onChange={handleInputChange}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+                />
               </div>
 
               <div>
