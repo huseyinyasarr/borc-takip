@@ -3,13 +3,13 @@ import { useState } from 'react'
 /**
  * Ay seçici component - Ekstre ayı seçimi için
  */
-const MonthSelector = ({ value, onChange, label = 'Ekstre Ayı' }) => {
+const MonthSelector = ({ value, onChange, label = 'Ekstre Ayı', wrapperClassName = 'mb-4' }) => {
   const handleChange = (e) => {
     onChange(e.target.value)
   }
 
   return (
-    <div className="mb-4">
+    <div className={wrapperClassName}>
       <label htmlFor="month-selector" className="block text-sm font-medium text-gray-700 mb-2">
         {label}
       </label>

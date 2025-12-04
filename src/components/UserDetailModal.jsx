@@ -73,8 +73,8 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
     }
   }
 
-  // Kullanıcının tüm unique mağazalarını (description) bul
-  const uniqueStores = [...new Set(purchases.map((p) => p.description).filter(Boolean))].sort()
+  // Kullanıcının tüm unique mağazalarını (storeName) bul
+  const uniqueStores = [...new Set(purchases.map((p) => p.storeName || p.description).filter(Boolean))].sort()
 
   // Kart ve mağaza filtresine göre harcamaları filtrele
   let filteredPurchases = purchases
@@ -84,9 +84,9 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
     filteredPurchases = filteredPurchases.filter((p) => p.cardId === selectedCard)
   }
   
-  // Mağaza filtresi
+  // Mağaza filtresi - sadece mağaza adına göre filtrele
   if (selectedStore !== 'all') {
-    filteredPurchases = filteredPurchases.filter((p) => p.description === selectedStore)
+    filteredPurchases = filteredPurchases.filter((p) => (p.storeName || p.description) === selectedStore)
   }
 
   // Bu ay için taksit bilgilerini hesapla (filtrelenmiş harcamalara göre)
@@ -330,18 +330,21 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                 </h2>
               )}
             </div>
-            <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex flex-wrap items-end gap-4 justify-end">
               {user && (
-                <MonthSelector
-                  value={selectedMonth}
-                  onChange={setSelectedMonth}
-                  label="Ekstre Ayı"
-                />
+                <div className="flex flex-col">
+                  <MonthSelector
+                    value={selectedMonth}
+                    onChange={setSelectedMonth}
+                    label="Ekstre Ayı"
+                    wrapperClassName="mb-0 min-w-[180px]"
+                  />
+                </div>
               )}
               {cards.length > 0 && (
                 <div className="flex flex-col">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Kart Filtresi
+                    Kart
                   </label>
                   <select
                     value={selectedCard}
@@ -360,7 +363,7 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
               {uniqueStores.length > 0 && (
                 <div className="flex flex-col">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Mağaza Filtresi
+                    Mağaza
                   </label>
                   <select
                     value={selectedStore}
@@ -442,7 +445,7 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                     </div>
                     {selectedStore !== 'all' && (
                       <div className="text-xs text-gray-500 mt-1">
-                        {selectedStore} mağazası
+                        {selectedStore} mağazasından
                       </div>
                     )}
                   </div>
@@ -452,7 +455,7 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                 {selectedStore !== 'all' && (
                   <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm text-blue-800">
-                      <span className="font-semibold">{selectedStore}</span> mağazasından yapılan alışverişler gösteriliyor.
+                      <span className="font-semibold">{selectedStore}</span> mağazasından yapılan tüm alışverişler gösteriliyor.
                     </p>
                   </div>
                 )}
@@ -599,7 +602,11 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                           purchaseDetails.map((detail) => (
                             <tr key={detail.id} className="hover:bg-gray-50">
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {detail.description}
+                                {detail.storeName 
+                                  ? (detail.productName 
+                                      ? `${detail.storeName} - ${detail.productName}`
+                                      : detail.storeName)
+                                  : detail.description || '-'}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                 {formatCurrency(detail.totalAmount)}

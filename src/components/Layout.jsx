@@ -37,7 +37,7 @@ const Layout = ({ children }) => {
                 <div className="flex-shrink-0 flex items-center">
                   <Link to="/" className="flex items-center">
                     <img 
-                      src="/logo.png" 
+                      src={`${import.meta.env.BASE_URL}logo.png`} 
                       alt="Borç Takip Sistemi" 
                       className="h-10 w-auto"
                       onError={(e) => {

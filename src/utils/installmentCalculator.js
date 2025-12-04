@@ -92,12 +92,19 @@ export const getInstallmentInfoForMonth = (purchase, targetMonth) => {
 
   const installmentNumber = monthDiff + 1
 
+  // Mağaza Adı - Ürün Adı formatında göster (ürün adı varsa)
+  const purchaseDescription = purchase.storeName
+    ? (purchase.productName 
+        ? `${purchase.storeName} - ${purchase.productName}`
+        : purchase.storeName)
+    : purchase.description || 'Harcama'
+
   return {
     amount,
     installmentNumber,
     totalInstallments: purchase.installmentCount,
     purchaseId: purchase.id,
-    purchaseDescription: purchase.description
+    purchaseDescription
   }
 }
 

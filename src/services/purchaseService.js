@@ -113,7 +113,8 @@ export const createPurchase = async (purchaseData) => {
     const docRef = await addDoc(collection(db, PURCHASES_COLLECTION), {
       userId: purchaseData.userId,
       cardId: purchaseData.cardId || null, // Kart ID'si (opsiyonel, geriye dönük uyumluluk için)
-      description: purchaseData.description,
+      storeName: purchaseData.storeName,
+      productName: purchaseData.productName?.trim() || null, // Ürün adı opsiyonel
       totalAmount: parseFloat(purchaseData.totalAmount),
       installmentCount: parseInt(purchaseData.installmentCount),
       firstInstallmentDate: firstInstallmentTimestamp,
@@ -137,6 +138,7 @@ export const updatePurchase = async (purchaseId, purchaseData) => {
     // Tarihleri Timestamp'e çevir
     const updateData = {
       ...purchaseData,
+      productName: purchaseData.productName?.trim() || null, // Ürün adı opsiyonel
       totalAmount: parseFloat(purchaseData.totalAmount),
       installmentCount: parseInt(purchaseData.installmentCount),
       updatedAt: Timestamp.now()
