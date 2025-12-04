@@ -1,4 +1,4 @@
-  import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import html2canvas from 'html2canvas'
 import { getUsers } from '../services/userService'
 import { getPurchases } from '../services/purchaseService'
@@ -333,12 +333,12 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
             <div className="flex flex-wrap items-end gap-4 justify-end">
               {user && (
                 <div className="flex flex-col">
-                  <MonthSelector
-                    value={selectedMonth}
-                    onChange={setSelectedMonth}
-                    label="Ekstre Ayı"
+                <MonthSelector
+                  value={selectedMonth}
+                  onChange={setSelectedMonth}
+                  label="Ekstre Ayı"
                     wrapperClassName="mb-0 min-w-[180px]"
-                  />
+                />
                 </div>
               )}
               {cards.length > 0 && (
@@ -349,7 +349,7 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                   <select
                     value={selectedCard}
                     onChange={(e) => setSelectedCard(e.target.value)}
-                    className="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border min-w-[180px]"
+                    className="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm h-9 px-3 border min-w-[180px] leading-5 bg-white"
                   >
                     <option value="all">Tüm Kartlar</option>
                     {cards.map((card) => (
@@ -368,7 +368,7 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                   <select
                     value={selectedStore}
                     onChange={(e) => setSelectedStore(e.target.value)}
-                    className="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border min-w-[180px]"
+                    className="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm h-9 px-3 border min-w-[180px] leading-5 bg-white"
                   >
                     <option value="all">Tüm Mağazalar</option>
                     {uniqueStores.map((store) => (

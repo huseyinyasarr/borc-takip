@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getAllUsers, createUser, updateUser, softDeleteUser } from '../services/userService'
 import { getPurchases } from '../services/purchaseService'
 import { calculateUserTotalDebt } from '../utils/installmentCalculator'
@@ -23,6 +23,7 @@ const Users = () => {
     note: ''
   })
   const [errors, setErrors] = useState({})
+  const formRef = useRef(null)
 
   // Hazır renk seçenekleri
   const colorOptions = [
@@ -89,16 +90,42 @@ const Users = () => {
 
     try {
       if (editingUser) {
-        // Güncelleme
-        await updateUser(editingUser.id, {
-          name: formData.name.trim(),
-          color: formData.color,
-          note: formData.note.trim()
-        })
+        const newName = formData.name.trim()
+        const oldName = editingUser.name
+        const description =
+          oldName !== newName
+            ? `${oldName} kişisinin adı ${newName} olarak güncellendi.`
+            : `${newName} kişisi güncellendi.`
+
+        await updateUser(
+          editingUser.id,
+          {
+            name: newName,
+            color: formData.color,
+            note: formData.note.trim()
+          },
+          {
+            description,
+            meta: {
+              userName: newName,
+              oldName
+            }
+          }
+        )
         alert('Kullanıcı güncellendi')
       } else {
         // Yeni kullanıcı
-        await createUser(formData)
+        const newName = formData.name.trim()
+        await createUser(
+          {
+            ...formData,
+            name: newName
+          },
+          {
+            description: `${newName} kişisi eklendi.`,
+            meta: { userName: newName }
+          }
+        )
         alert('Kullanıcı eklendi')
       }
 
@@ -129,15 +156,24 @@ const Users = () => {
       note: user.note || ''
     })
     setShowForm(true)
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, 0)
   }
 
-  const handleDelete = async (userId) => {
+  const handleDelete = async (user) => {
     if (!window.confirm('Bu kullanıcıyı pasif yapmak istediğinize emin misiniz?')) {
       return
     }
 
     try {
-      await softDeleteUser(userId)
+      await softDeleteUser(user.id, {
+        description: `${user.name} kişisi silindi.`,
+        meta: {
+          userId: user.id,
+          userName: user.name
+        }
+      })
       alert('Kullanıcı pasif yapıldı')
       loadData()
     } catch (error) {
@@ -146,9 +182,19 @@ const Users = () => {
     }
   }
 
-  const handleActivate = async (userId) => {
+  const handleActivate = async (user) => {
     try {
-      await updateUser(userId, { isActive: true })
+      await updateUser(
+        user.id,
+        { isActive: true },
+        {
+          description: `${user.name} kişisi yeniden aktif edildi.`,
+          meta: {
+            userId: user.id,
+            userName: user.name
+          }
+        }
+      )
       alert('Kullanıcı aktif yapıldı')
       loadData()
     } catch (error) {
@@ -182,6 +228,9 @@ const Users = () => {
           onClick={() => {
             resetForm()
             setShowForm(true)
+            setTimeout(() => {
+              formRef.current?.scrollIntoView({ behavior: 'smooth' })
+            }, 0)
           }}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
         >
@@ -191,7 +240,7 @@ const Users = () => {
 
       {/* Form */}
       {showForm && (
-        <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <div ref={formRef} className="bg-white p-6 rounded-lg shadow mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
             {editingUser ? 'Kullanıcı Düzenle' : 'Yeni Kullanıcı'}
           </h3>
@@ -317,7 +366,7 @@ const Users = () => {
                       Düzenle
                     </button>
                     <button
-                      onClick={() => handleDelete(user.id)}
+                      onClick={() => handleDelete(user)}
                       className="text-red-600 hover:text-red-900"
                     >
                       Pasif Yap
@@ -374,7 +423,7 @@ const Users = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
-                        onClick={() => handleActivate(user.id)}
+                        onClick={() => handleActivate(user)}
                         className="text-green-600 hover:text-green-900"
                       >
                         Aktif Yap

@@ -11,6 +11,7 @@ import {
   Timestamp
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
+import { createLog } from './logService'
 
 const USERS_COLLECTION = 'users'
 
@@ -75,7 +76,7 @@ export const getAllUsers = async () => {
 /**
  * Yeni kullanıcı oluştur
  */
-export const createUser = async (userData) => {
+export const createUser = async (userData, logOptions = {}) => {
   try {
     const docRef = await addDoc(collection(db, USERS_COLLECTION), {
       name: userData.name,
@@ -84,6 +85,17 @@ export const createUser = async (userData) => {
       note: userData.note || '',
       createdAt: Timestamp.now()
     })
+    const userName = userData.name?.trim() || userData.name || 'Kişi'
+    await createLog({
+      action: logOptions.action || 'user_create',
+      description: logOptions.description || `${userName} kişisi eklendi.`,
+      meta: {
+        userId: docRef.id,
+        userName,
+        ...(logOptions.meta || {})
+      }
+    })
+
     return docRef.id
   } catch (error) {
     console.error('Kullanıcı oluşturulurken hata:', error)
@@ -94,12 +106,21 @@ export const createUser = async (userData) => {
 /**
  * Kullanıcı bilgilerini güncelle
  */
-export const updateUser = async (userId, userData) => {
+export const updateUser = async (userId, userData, logOptions = {}) => {
   try {
     const userRef = doc(db, USERS_COLLECTION, userId)
     await updateDoc(userRef, {
       ...userData,
       updatedAt: Timestamp.now()
+    })
+
+    await createLog({
+      action: logOptions.action || 'user_update',
+      description: logOptions.description || 'Kişi bilgileri güncellendi.',
+      meta: {
+        userId,
+        ...(logOptions.meta || {})
+      }
     })
   } catch (error) {
     console.error('Kullanıcı güncellenirken hata:', error)
@@ -110,12 +131,21 @@ export const updateUser = async (userId, userData) => {
 /**
  * Kullanıcıyı pasif yap (soft delete)
  */
-export const softDeleteUser = async (userId) => {
+export const softDeleteUser = async (userId, logOptions = {}) => {
   try {
     const userRef = doc(db, USERS_COLLECTION, userId)
     await updateDoc(userRef, {
       isActive: false,
       updatedAt: new Date()
+    })
+
+    await createLog({
+      action: logOptions.action || 'user_delete',
+      description: logOptions.description || 'Kişi silindi.',
+      meta: {
+        userId,
+        ...(logOptions.meta || {})
+      }
     })
   } catch (error) {
     console.error('Kullanıcı pasif yapılırken hata:', error)

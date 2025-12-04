@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getAllCards, createCard, updateCard, softDeleteCard } from '../services/cardService'
 import CardColorBadge from '../components/CardColorBadge'
 
@@ -16,6 +16,7 @@ const Cards = () => {
     note: ''
   })
   const [errors, setErrors] = useState({})
+  const formRef = useRef(null)
 
   // Hazır renk seçenekleri
   const colorOptions = [
@@ -79,15 +80,40 @@ const Cards = () => {
 
     try {
       if (editingCard) {
-        // Güncelleme
-        await updateCard(editingCard.id, {
-          name: formData.name.trim(),
-          color: formData.color,
-          note: formData.note.trim()
-        })
+        const newName = formData.name.trim()
+        const oldName = editingCard.name
+        const description =
+          oldName !== newName
+            ? `${oldName} kartının adı ${newName} olarak güncellendi.`
+            : `${newName} kartı güncellendi.`
+
+        await updateCard(
+          editingCard.id,
+          {
+            name: newName,
+            color: formData.color,
+            note: formData.note.trim()
+          },
+          {
+            description,
+            meta: {
+              cardName: newName,
+              oldName
+            }
+          }
+        )
       } else {
-        // Yeni kart
-        await createCard(formData)
+        const newName = formData.name.trim()
+        await createCard(
+          {
+            ...formData,
+            name: newName
+          },
+          {
+            description: `${newName} kartı eklendi.`,
+            meta: { cardName: newName }
+          }
+        )
       }
 
       resetForm()
@@ -121,24 +147,43 @@ const Cards = () => {
       note: card.note || ''
     })
     setShowForm(true)
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, 0)
   }
 
-  const handleDelete = async (cardId) => {
+  const handleDelete = async (card) => {
     if (!window.confirm('Bu kartı pasif yapmak istediğinize emin misiniz?')) {
       return
     }
 
     try {
-      await softDeleteCard(cardId)
+      await softDeleteCard(card.id, {
+        description: `${card.name} kartı silindi.`,
+        meta: {
+          cardId: card.id,
+          cardName: card.name
+        }
+      })
       loadData()
     } catch (error) {
       console.error('Kart pasif yapılırken hata:', error)
     }
   }
 
-  const handleActivate = async (cardId) => {
+  const handleActivate = async (card) => {
     try {
-      await updateCard(cardId, { isActive: true })
+      await updateCard(
+        card.id,
+        { isActive: true },
+        {
+          description: `${card.name} kartı yeniden aktif edildi.`,
+          meta: {
+            cardId: card.id,
+            cardName: card.name
+          }
+        }
+      )
       loadData()
     } catch (error) {
       console.error('Kart aktif yapılırken hata:', error)
@@ -164,6 +209,9 @@ const Cards = () => {
           onClick={() => {
             resetForm()
             setShowForm(true)
+            setTimeout(() => {
+              formRef.current?.scrollIntoView({ behavior: 'smooth' })
+            }, 0)
           }}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
         >
@@ -173,7 +221,7 @@ const Cards = () => {
 
       {/* Form */}
       {showForm && (
-        <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <div ref={formRef} className="bg-white p-6 rounded-lg shadow mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
             {editingCard ? 'Kart Düzenle' : 'Yeni Kart'}
           </h3>
@@ -266,7 +314,7 @@ const Cards = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Kart
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   İşlemler
                 </th>
               </tr>
@@ -280,19 +328,21 @@ const Cards = () => {
                       <p className="text-xs text-gray-500 mt-1">{card.note}</p>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => handleEdit(card)}
-                      className="text-blue-600 hover:text-blue-900 mr-4"
-                    >
-                      Düzenle
-                    </button>
-                    <button
-                      onClick={() => handleDelete(card.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Pasif Yap
-                    </button>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                    <div className="inline-flex items-center gap-4">
+                      <button
+                        onClick={() => handleEdit(card)}
+                        className="text-blue-600 hover:text-blue-900"
+                      >
+                        Düzenle
+                      </button>
+                      <button
+                        onClick={() => handleDelete(card)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Pasif Yap
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -321,7 +371,7 @@ const Cards = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Kart
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     İşlemler
                   </th>
                 </tr>
@@ -332,9 +382,9 @@ const Cards = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <CardColorBadge color={card.color} name={card.name} />
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
                       <button
-                        onClick={() => handleActivate(card.id)}
+                        onClick={() => handleActivate(card)}
                         className="text-green-600 hover:text-green-900"
                       >
                         Aktif Yap

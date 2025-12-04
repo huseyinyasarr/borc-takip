@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { format } from 'date-fns'
 import { getPurchases, createPurchase, updatePurchase, deletePurchase } from '../services/purchaseService'
 import { getAllUsers } from '../services/userService'
@@ -24,6 +24,7 @@ const Purchases = () => {
   const [filterDateTo, setFilterDateTo] = useState('')
   const [selectedUserForDetail, setSelectedUserForDetail] = useState(null)
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth())
+  const formRef = useRef(null)
   const [formData, setFormData] = useState({
     userId: '',
     cardId: '',
@@ -113,36 +114,88 @@ const Purchases = () => {
 
     try {
       if (editingPurchase) {
-        // Güncelleme
-        await updatePurchase(editingPurchase.id, {
-          userId: formData.userId,
-          cardId: formData.cardId,
-          storeName: formData.storeName.trim(),
-          productName: formData.productName?.trim() || '',
-          totalAmount: formData.totalAmount,
-          installmentCount: formData.installmentCount,
-          purchaseDate: formData.purchaseDate
-            ? new Date(formData.purchaseDate)
-            : null,
-          firstInstallmentDate: new Date(formData.firstInstallmentDate),
-          currency: formData.currency
-        })
+        const userName = getUserNameById(formData.userId)
+        const cardName = getCardNameById(formData.cardId)
+        const storeLabel = buildStoreLabel(formData.storeName, formData.productName)
+        const oldAmountText = formatAmountText(editingPurchase.totalAmount)
+        const newAmountText = formatAmountText(formData.totalAmount)
+        const oldInstallmentValue = formatInstallmentValue(editingPurchase.installmentCount)
+        const newInstallmentValue = formatInstallmentValue(formData.installmentCount)
+
+        await updatePurchase(
+          editingPurchase.id,
+          {
+            userId: formData.userId,
+            cardId: formData.cardId,
+            storeName: formData.storeName.trim(),
+            productName: formData.productName?.trim() || '',
+            totalAmount: formData.totalAmount,
+            installmentCount: formData.installmentCount,
+            purchaseDate: formData.purchaseDate
+              ? new Date(formData.purchaseDate)
+              : null,
+            firstInstallmentDate: new Date(formData.firstInstallmentDate),
+            currency: formData.currency
+          },
+          {
+            description: buildLogDescription('update', {
+              userName,
+              storeLabel,
+              cardName,
+              oldAmountText,
+              newAmountText,
+              oldInstallmentValue,
+              newInstallmentValue
+            }),
+            meta: {
+              userName,
+              cardName,
+              storeLabel,
+              oldAmountText,
+              newAmountText,
+              oldInstallmentValue,
+              newInstallmentValue
+            }
+          }
+        )
         alert('Harcama güncellendi')
       } else {
-        // Yeni harcama
-        await createPurchase({
-          userId: formData.userId,
-          cardId: formData.cardId,
-          storeName: formData.storeName.trim(),
-          productName: formData.productName?.trim() || '',
-          totalAmount: formData.totalAmount,
-          installmentCount: formData.installmentCount,
-          purchaseDate: formData.purchaseDate
-            ? new Date(formData.purchaseDate)
-            : null,
-          firstInstallmentDate: new Date(formData.firstInstallmentDate),
-          currency: formData.currency
-        })
+        const userName = getUserNameById(formData.userId)
+        const cardName = getCardNameById(formData.cardId)
+        const storeLabel = buildStoreLabel(formData.storeName, formData.productName)
+        const newAmountText = formatAmountText(formData.totalAmount)
+        const newInstallmentValue = formatInstallmentValue(formData.installmentCount)
+
+        await createPurchase(
+          {
+            userId: formData.userId,
+            cardId: formData.cardId,
+            storeName: formData.storeName.trim(),
+            productName: formData.productName?.trim() || '',
+            totalAmount: formData.totalAmount,
+            installmentCount: formData.installmentCount,
+            purchaseDate: formData.purchaseDate
+              ? new Date(formData.purchaseDate)
+              : null,
+            firstInstallmentDate: new Date(formData.firstInstallmentDate),
+            currency: formData.currency
+          },
+          {
+            description: buildLogDescription('create', {
+              userName,
+              storeLabel,
+              cardName,
+              newAmountText
+            }),
+            meta: {
+              userName,
+              cardName,
+              storeLabel,
+              newAmountText,
+              newInstallmentValue
+            }
+          }
+        )
         alert('Harcama eklendi')
       }
 
@@ -190,15 +243,38 @@ const Purchases = () => {
       currency: purchase.currency || 'TRY'
     })
     setShowForm(true)
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, 0)
   }
 
-  const handleDelete = async (purchaseId) => {
+  const handleDelete = async (purchase) => {
     if (!window.confirm('Bu harcamayı silmek istediğinize emin misiniz?')) {
       return
     }
 
     try {
-      await deletePurchase(purchaseId)
+      const userName = getUserNameById(purchase.userId)
+      const cardName = getCardNameById(purchase.cardId)
+      const storeLabel = buildStoreLabel(purchase.storeName, purchase.productName)
+      const oldAmountText = formatAmountText(purchase.totalAmount)
+      const oldInstallmentValue = formatInstallmentValue(purchase.installmentCount)
+
+      await deletePurchase(purchase.id, {
+        description: buildLogDescription('delete', {
+          userName,
+          storeLabel,
+          cardName,
+          oldAmountText
+        }),
+        meta: {
+          userName,
+          cardName,
+          storeLabel,
+          oldAmountText,
+          oldInstallmentValue
+        }
+      })
       alert('Harcama silindi')
       loadData()
     } catch (error) {
@@ -252,6 +328,88 @@ const Purchases = () => {
     return cards.find((c) => c.id === cardId)
   }
 
+  const getUserNameById = (userId) => {
+    const user = getUser(userId)
+    return user?.name || 'Bilinmeyen kişi'
+  }
+
+  const getCardNameById = (cardId) => {
+    const card = getCard(cardId)
+    return card?.name || null
+  }
+
+  const buildStoreLabel = (storeName, productName) => {
+    if (storeName && productName) {
+      return `${storeName} - ${productName}`
+    }
+    return storeName || productName || 'Alışveriş'
+  }
+
+  const formatAmountText = (amount) => {
+    if (!amount && amount !== 0) return ''
+    const numeric = typeof amount === 'number' ? amount : parseFloat(amount)
+    if (Number.isNaN(numeric)) {
+      return ''
+    }
+    return formatCurrency(numeric)
+  }
+
+  const formatInstallmentValue = (count) => {
+    if (count === undefined || count === null) return null
+    const numeric = parseInt(count, 10)
+    if (Number.isNaN(numeric)) return null
+    return numeric.toString()
+  }
+
+  const buildLogDescription = (
+    type,
+    {
+      userName,
+      storeLabel,
+      cardName,
+      oldAmountText,
+      newAmountText,
+      oldInstallmentValue,
+      newInstallmentValue
+    }
+  ) => {
+    const cardText = cardName ? ` (${cardName} kartı)` : ''
+
+    const detailParts = []
+    if (
+      oldAmountText &&
+      newAmountText &&
+      oldAmountText !== newAmountText
+    ) {
+      detailParts.push(
+        `tutar ${oldAmountText} değerinden ${newAmountText} değerine güncellendi`
+      )
+    }
+
+    if (
+      oldInstallmentValue &&
+      newInstallmentValue &&
+      oldInstallmentValue !== newInstallmentValue
+    ) {
+      detailParts.push(
+        `taksit sayısı ${oldInstallmentValue}'dan ${newInstallmentValue} olarak güncellendi`
+      )
+    }
+
+    const detailText = detailParts.length ? ` ${detailParts.join(' ve ')}.` : ''
+
+    switch (type) {
+      case 'create':
+        return `${userName} kişisi için ${storeLabel} alışverişi${cardText} ${newAmountText || ''} tutarıyla eklendi.`.trim()
+      case 'update':
+        return `${userName} kişisi için ${storeLabel} alışverişi${cardText} güncellendi.${detailText || ''}`.trim()
+      case 'delete':
+        return `${userName} kişisi için ${storeLabel} alışverişi${cardText} silindi${oldAmountText ? ` (tutar: ${oldAmountText})` : ''}.`
+      default:
+        return `${userName} kişisi için ${storeLabel} alışverişi işlem gördü.`
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -268,6 +426,9 @@ const Purchases = () => {
           onClick={() => {
             resetForm()
             setShowForm(true)
+            setTimeout(() => {
+              formRef.current?.scrollIntoView({ behavior: 'smooth' })
+            }, 0)
           }}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
         >
@@ -342,7 +503,7 @@ const Purchases = () => {
 
       {/* Form */}
       {showForm && (
-        <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <div ref={formRef} className="bg-white p-6 rounded-lg shadow mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
             {editingPurchase ? 'Harcama Düzenle' : 'Yeni Harcama'}
           </h3>
@@ -630,7 +791,7 @@ const Purchases = () => {
                         Düzenle
                       </button>
                       <button
-                        onClick={() => handleDelete(purchase.id)}
+                        onClick={() => handleDelete(purchase)}
                         className="text-red-600 hover:text-red-900"
                       >
                         Sil

@@ -12,6 +12,7 @@ import {
   Timestamp
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
+import { createLog } from './logService'
 
 const PURCHASES_COLLECTION = 'purchases'
 
@@ -120,7 +121,7 @@ export const getPurchasesByUserId = async (userId) => {
 /**
  * Yeni harcama oluştur
  */
-export const createPurchase = async (purchaseData) => {
+export const createPurchase = async (purchaseData, logContext = {}) => {
   try {
     // Tarihleri Timestamp'e çevir
     const firstInstallmentTimestamp = purchaseData.firstInstallmentDate instanceof Date
@@ -145,6 +146,23 @@ export const createPurchase = async (purchaseData) => {
       currency: purchaseData.currency || 'TRY',
       createdAt: Timestamp.now()
     })
+
+    await createLog({
+      action: 'purchase_create',
+      description:
+        logContext.description ||
+        `${purchaseData.storeName || 'Mağaza'} için harcama eklendi`,
+      meta: {
+        purchaseId: docRef.id,
+        userId: purchaseData.userId,
+        cardId: purchaseData.cardId || null,
+        storeName: purchaseData.storeName || null,
+        productName: purchaseData.productName || null,
+        totalAmount: parseFloat(purchaseData.totalAmount),
+        ...(logContext.meta || {})
+      }
+    })
+
     return docRef.id
   } catch (error) {
     console.error('Harcama oluşturulurken hata:', error)
@@ -155,7 +173,7 @@ export const createPurchase = async (purchaseData) => {
 /**
  * Harcama bilgilerini güncelle
  */
-export const updatePurchase = async (purchaseId, purchaseData) => {
+export const updatePurchase = async (purchaseId, purchaseData, logContext = {}) => {
   try {
     const purchaseRef = doc(db, PURCHASES_COLLECTION, purchaseId)
     
@@ -182,6 +200,22 @@ export const updatePurchase = async (purchaseId, purchaseData) => {
     }
 
     await updateDoc(purchaseRef, updateData)
+
+    await createLog({
+      action: 'purchase_update',
+      description:
+        logContext.description ||
+        `${purchaseData.storeName || 'Mağaza'} için harcama güncellendi`,
+      meta: {
+        purchaseId,
+        userId: purchaseData.userId,
+        cardId: purchaseData.cardId || null,
+        storeName: purchaseData.storeName || null,
+        productName: purchaseData.productName || null,
+        totalAmount: parseFloat(purchaseData.totalAmount),
+        ...(logContext.meta || {})
+      }
+    })
   } catch (error) {
     console.error('Harcama güncellenirken hata:', error)
     throw error
@@ -191,9 +225,18 @@ export const updatePurchase = async (purchaseId, purchaseData) => {
 /**
  * Harcamayı sil
  */
-export const deletePurchase = async (purchaseId) => {
+export const deletePurchase = async (purchaseId, logContext = {}) => {
   try {
     await deleteDoc(doc(db, PURCHASES_COLLECTION, purchaseId))
+
+    await createLog({
+      action: 'purchase_delete',
+      description: logContext.description || 'Harcama silindi',
+      meta: {
+        purchaseId,
+        ...(logContext.meta || {})
+      }
+    })
   } catch (error) {
     console.error('Harcama silinirken hata:', error)
     throw error

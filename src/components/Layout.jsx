@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { auth } from '../config/firebase'
+import LogModal from './LogModal'
 
 /**
  * Ana layout componenti - Navigation ve sayfa yapısı
@@ -9,6 +10,7 @@ import { auth } from '../config/firebase'
 const Layout = ({ children }) => {
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [logModalOpen, setLogModalOpen] = useState(false)
 
   const handleSignOut = async () => {
     if (window.confirm('Çıkış yapmak istediğinize emin misiniz?')) {
@@ -97,6 +99,12 @@ const Layout = ({ children }) => {
                 </div>
               </div>
               <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setLogModalOpen(true)}
+                  className="hidden sm:inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Loglar
+                </button>
                 {/* Hamburger Menu Button - Sadece mobilde görünür */}
                 <button
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -177,6 +185,15 @@ const Layout = ({ children }) => {
               >
                 Harcamalar
               </Link>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false)
+                  setLogModalOpen(true)
+                }}
+                className="block w-full text-left pl-3 pr-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Loglar
+              </button>
               <div className="pt-2 pb-3 border-t border-gray-200">
                 <button
                   onClick={() => {
@@ -197,6 +214,7 @@ const Layout = ({ children }) => {
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">{children}</div>
       </main>
+      <LogModal isOpen={logModalOpen} onClose={() => setLogModalOpen(false)} />
     </div>
   )
 }

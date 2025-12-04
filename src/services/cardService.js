@@ -11,6 +11,7 @@ import {
   Timestamp
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
+import { createLog } from './logService'
 
 const CARDS_COLLECTION = 'cards'
 
@@ -67,7 +68,7 @@ export const getAllCards = async () => {
 /**
  * Yeni kart oluştur
  */
-export const createCard = async (cardData) => {
+export const createCard = async (cardData, logOptions = {}) => {
   try {
     const docRef = await addDoc(collection(db, CARDS_COLLECTION), {
       name: cardData.name.trim(),
@@ -77,6 +78,18 @@ export const createCard = async (cardData) => {
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now()
     })
+    const cardName = cardData.name?.trim() || cardData.name || 'Kart'
+
+    await createLog({
+      action: logOptions.action || 'card_create',
+      description: logOptions.description || `${cardName} kartı eklendi.`,
+      meta: {
+        cardId: docRef.id,
+        cardName,
+        ...(logOptions.meta || {})
+      }
+    })
+
     return docRef.id
   } catch (error) {
     console.error('Kart oluşturulurken hata:', error)
@@ -87,7 +100,7 @@ export const createCard = async (cardData) => {
 /**
  * Kart bilgilerini güncelle
  */
-export const updateCard = async (cardId, cardData) => {
+export const updateCard = async (cardId, cardData, logOptions = {}) => {
   try {
     const cardRef = doc(db, CARDS_COLLECTION, cardId)
     const updateData = {
@@ -109,6 +122,15 @@ export const updateCard = async (cardId, cardData) => {
     }
     
     await updateDoc(cardRef, updateData)
+
+    await createLog({
+      action: logOptions.action || 'card_update',
+      description: logOptions.description || 'Kart bilgileri güncellendi.',
+      meta: {
+        cardId,
+        ...(logOptions.meta || {})
+      }
+    })
   } catch (error) {
     console.error('Kart güncellenirken hata:', error)
     throw error
@@ -118,12 +140,21 @@ export const updateCard = async (cardId, cardData) => {
 /**
  * Kartı pasif yap (soft delete)
  */
-export const softDeleteCard = async (cardId) => {
+export const softDeleteCard = async (cardId, logOptions = {}) => {
   try {
     const cardRef = doc(db, CARDS_COLLECTION, cardId)
     await updateDoc(cardRef, {
       isActive: false,
       updatedAt: Timestamp.now()
+    })
+
+    await createLog({
+      action: logOptions.action || 'card_delete',
+      description: logOptions.description || 'Kart silindi.',
+      meta: {
+        cardId,
+        ...(logOptions.meta || {})
+      }
     })
   } catch (error) {
     console.error('Kart pasif yapılırken hata:', error)

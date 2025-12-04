@@ -94,8 +94,8 @@ const Dashboard = () => {
     (stat) => stat.monthTotal > 0 || stat.totalDebt > 0
   )
 
-  // Genel toplamlar
-  const grandTotal = userStats.reduce(
+  // Genel toplamlar (seçili filtrelere göre)
+  const grandTotal = filteredStats.reduce(
     (sum, stat) => sum + stat.monthTotal,
     0
   )
