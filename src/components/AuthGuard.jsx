@@ -95,7 +95,7 @@ const AuthGuard = ({ children }) => {
       if (error.code === 'auth/popup-closed-by-user') {
         setError('Giriş penceresi kapatıldı. Lütfen tekrar deneyin.')
       } else if (error.code === 'auth/unauthorized-domain') {
-        setError('Domain yetkilendirme hatası! Firebase Console\'da: Authentication → Settings → Authorized domains sekmesine gidin ve \'localhost\' domain\'ini ekleyin.')
+        setError('Domain yetkilendirme hatası! Firebase Console ayarlarını kontrol edin.')
       } else if (error.code === 'auth/admin-restricted-operation') {
         setError('Google Authentication aktif değil. Firebase Console\'dan Google provider\'ını aktifleştirin ve Authorized domains\'e localhost ekleyin.')
       } else if (error.code === 'auth/operation-not-allowed') {
