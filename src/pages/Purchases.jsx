@@ -3,6 +3,13 @@ import { format } from 'date-fns'
 import { getPurchases, createPurchase, updatePurchase, deletePurchase } from '../services/purchaseService'
 import { getAllUsers } from '../services/userService'
 import { getCards } from '../services/cardService'
+import {
+  getAllPaymentRecords,
+  getPaymentRecords,
+  createPaymentRecord,
+  updatePaymentRecord,
+  deletePaymentRecord
+} from '../services/paymentService'
 import { formatCurrency, formatDateLong, getCurrentMonth } from '../utils/dateUtils'
 import UserColorBadge from '../components/UserColorBadge'
 import CardColorBadge from '../components/CardColorBadge'
@@ -13,17 +20,21 @@ import UserDetailModal from '../components/UserDetailModal'
  */
 const Purchases = () => {
   const [purchases, setPurchases] = useState([])
+  const [paymentRecords, setPaymentRecords] = useState([])
   const [users, setUsers] = useState([])
   const [cards, setCards] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingPurchase, setEditingPurchase] = useState(null)
+  const [editingPayment, setEditingPayment] = useState(null)
   const [filterUserId, setFilterUserId] = useState('all')
   const [filterCardId, setFilterCardId] = useState('all')
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
+  const [filterType, setFilterType] = useState('all') // 'all', 'purchases', 'payments'
   const [selectedUserForDetail, setSelectedUserForDetail] = useState(null)
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth())
+  const [showPaymentForm, setShowPaymentForm] = useState(false)
   const formRef = useRef(null)
   const [formData, setFormData] = useState({
     userId: '',
@@ -46,12 +57,14 @@ const Purchases = () => {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [purchasesData, usersData, cardsData] = await Promise.all([
+      const [purchasesData, paymentData, usersData, cardsData] = await Promise.all([
         getPurchases(),
+        getAllPaymentRecords(),
         getAllUsers(),
         getCards()
       ])
       setPurchases(purchasesData)
+      setPaymentRecords(paymentData)
       setUsers(usersData.filter((u) => u.isActive))
       setCards(cardsData.filter((c) => c.isActive))
     } catch (error) {
@@ -248,6 +261,25 @@ const Purchases = () => {
     }, 0)
   }
 
+  const handleEditPayment = (payment) => {
+    setEditingPayment(payment)
+    setShowPaymentForm(true)
+  }
+
+  const handleDeletePayment = async (payment) => {
+    if (!window.confirm('Bu ödeme kaydını silmek istediğinize emin misiniz?')) {
+      return
+    }
+    try {
+      await deletePaymentRecord(payment.id)
+      alert('Ödeme kaydı silindi')
+      loadData()
+    } catch (error) {
+      console.error('Ödeme silinirken hata:', error)
+      alert('Ödeme silinirken bir hata oluştu.')
+    }
+  }
+
   const handleDelete = async (purchase) => {
     if (!window.confirm('Bu harcamayı silmek istediğinize emin misiniz?')) {
       return
@@ -422,23 +454,45 @@ const Purchases = () => {
     <div>
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h2 className="text-2xl font-bold text-gray-900">Harcama Yönetimi</h2>
-        <button
-          onClick={() => {
-            resetForm()
-            setShowForm(true)
-            setTimeout(() => {
-              formRef.current?.scrollIntoView({ behavior: 'smooth' })
-            }, 0)
-          }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-        >
-          Yeni Harcama Ekle
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              resetForm()
+              setShowForm(true)
+              setTimeout(() => {
+                formRef.current?.scrollIntoView({ behavior: 'smooth' })
+              }, 0)
+            }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Yeni Harcama Ekle
+          </button>
+          <button
+            onClick={() => setShowPaymentForm(true)}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+          >
+            Ödeme Ekle
+          </button>
+        </div>
       </div>
 
       {/* Filtreler */}
       <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tip
+            </label>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+            >
+              <option value="all">Hepsi</option>
+              <option value="purchases">Harcamalar</option>
+              <option value="payments">Ödemeler</option>
+            </select>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Kullanıcı Filtresi
@@ -709,14 +763,15 @@ const Purchases = () => {
       )}
 
       {/* Harcama Listesi */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Harcamalar ({filteredPurchases.length})
-          </h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+      {(filterType === 'all' || filterType === 'purchases') && (
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Harcamalar ({filteredPurchases.length})
+            </h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -811,9 +866,120 @@ const Purchases = () => {
                 </tr>
               )}
             </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Ödemeler Listesi */}
+      {(filterType === 'all' || filterType === 'payments') && (
+        <div className={`bg-white shadow rounded-lg overflow-hidden ${(filterType === 'all' || filterType === 'purchases') ? 'mt-6' : ''}`}>
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Ödemeler ({paymentRecords.length})
+          </h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Kullanıcı
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Ekstre Ayı
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Ödeme Tarihi
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tutar
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Açıklama
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  İşlemler
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {paymentRecords.map((payment) => {
+                const user = users.find((u) => u.id === payment.userId)
+                return (
+                  <tr key={payment.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {user && (
+                        <button
+                          onClick={() => setSelectedUserForDetail(user.id)}
+                          className="hover:underline cursor-pointer"
+                        >
+                          <UserColorBadge color={user.color} name={user.name} />
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {payment.month}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatDateLong(payment.paymentDate)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {formatCurrency(payment.amount)}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {payment.description || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={() => handleEditPayment(payment)}
+                        className="text-blue-600 hover:text-blue-900 mr-4"
+                      >
+                        Düzenle
+                      </button>
+                      <button
+                        onClick={() => handleDeletePayment(payment)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Sil
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+              {paymentRecords.length === 0 && (
+                <tr>
+                  <td
+                    colSpan="6"
+                    className="px-6 py-4 text-center text-gray-500"
+                  >
+                    Ödeme kaydı bulunamadı
+                  </td>
+                </tr>
+              )}
+            </tbody>
           </table>
         </div>
       </div>
+      )}
+
+      {/* Ödeme Ekleme/Düzenleme Modal */}
+      {showPaymentForm && (
+        <PaymentModal
+          users={users}
+          selectedMonth={selectedMonth}
+          editingPayment={editingPayment}
+          onClose={() => {
+            setShowPaymentForm(false)
+            setEditingPayment(null)
+          }}
+          onSave={async () => {
+            await loadData()
+            setShowPaymentForm(false)
+            setEditingPayment(null)
+          }}
+        />
+      )}
 
       {/* Kullanıcı Detay Modal */}
       {selectedUserForDetail && (
@@ -823,6 +989,249 @@ const Purchases = () => {
           onClose={() => setSelectedUserForDetail(null)}
         />
       )}
+    </div>
+  )
+}
+
+/**
+ * Ödeme Ekleme/Düzenleme Modal Component
+ */
+const PaymentModal = ({ users, selectedMonth, editingPayment, onClose, onSave }) => {
+  const [formData, setFormData] = useState({
+    userId: editingPayment?.userId || '',
+    amount: editingPayment?.amount || '',
+    paymentDate: editingPayment?.paymentDate 
+      ? format(editingPayment.paymentDate, 'yyyy-MM-dd')
+      : format(new Date(), 'yyyy-MM-dd'),
+    description: editingPayment?.description || '',
+    month: editingPayment?.month || selectedMonth || getCurrentMonth()
+  })
+  const [errors, setErrors] = useState({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (editingPayment) {
+      setFormData({
+        userId: editingPayment.userId,
+        amount: editingPayment.amount,
+        paymentDate: format(editingPayment.paymentDate, 'yyyy-MM-dd'),
+        description: editingPayment.description || '',
+        month: editingPayment.month
+      })
+    } else {
+      setFormData({
+        userId: '',
+        amount: '',
+        paymentDate: format(new Date(), 'yyyy-MM-dd'),
+        description: '',
+        month: selectedMonth || getCurrentMonth()
+      })
+    }
+  }, [editingPayment, selectedMonth])
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: '' }))
+    }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    
+    const newErrors = {}
+    if (!formData.userId) {
+      newErrors.userId = 'Kullanıcı seçimi gereklidir'
+    }
+    if (!formData.amount || parseFloat(formData.amount) <= 0) {
+      newErrors.amount = 'Geçerli bir tutar giriniz'
+    }
+    if (!formData.paymentDate) {
+      newErrors.paymentDate = 'Ödeme tarihi gereklidir'
+    }
+    if (!formData.month) {
+      newErrors.month = 'Ekstre ayı gereklidir'
+    }
+
+    setErrors(newErrors)
+    if (Object.keys(newErrors).length === 0) {
+      setIsSubmitting(true)
+      try {
+        if (editingPayment) {
+          await updatePaymentRecord(editingPayment.id, {
+            amount: parseFloat(formData.amount),
+            paymentDate: new Date(formData.paymentDate),
+            description: formData.description.trim() || null
+          })
+          alert('Ödeme kaydı güncellendi')
+        } else {
+          await createPaymentRecord({
+            userId: formData.userId,
+            month: formData.month,
+            amount: parseFloat(formData.amount),
+            paymentDate: new Date(formData.paymentDate),
+            description: formData.description.trim() || null
+          })
+          alert('Ödeme kaydı eklendi')
+        }
+        onSave()
+      } catch (error) {
+        console.error('Ödeme kaydedilirken hata:', error)
+        alert(editingPayment ? 'Ödeme güncellenirken bir hata oluştu.' : 'Ödeme eklenirken bir hata oluştu.')
+      } finally {
+        setIsSubmitting(false)
+      }
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+        onClick={onClose}
+      ></div>
+
+      {/* Modal */}
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <h2 className="text-xl font-bold text-gray-900">
+              {editingPayment ? 'Ödeme Düzenle' : 'Ödeme Ekle'}
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+              aria-label="Kapat"
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="p-6">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Kullanıcı <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="userId"
+                  value={formData.userId}
+                  onChange={handleInputChange}
+                  disabled={!!editingPayment}
+                  className={`block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border ${
+                    errors.userId ? 'border-red-300' : ''
+                  } ${editingPayment ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                >
+                  <option value="">Kullanıcı Seçin</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.userId && (
+                  <p className="mt-1 text-sm text-red-600">{errors.userId}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Ekstre Ayı <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="month"
+                  name="month"
+                  value={formData.month}
+                  onChange={handleInputChange}
+                  disabled={!!editingPayment}
+                  className={`block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border ${
+                    errors.month ? 'border-red-300' : ''
+                  } ${editingPayment ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                />
+                {errors.month && (
+                  <p className="mt-1 text-sm text-red-600">{errors.month}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tutar <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  name="amount"
+                  value={formData.amount}
+                  onChange={handleInputChange}
+                  step="0.01"
+                  min="0"
+                  className={`block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border ${
+                    errors.amount ? 'border-red-300' : ''
+                  }`}
+                  placeholder="0.00"
+                />
+                {errors.amount && (
+                  <p className="mt-1 text-sm text-red-600">{errors.amount}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Ödeme Tarihi <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  name="paymentDate"
+                  value={formData.paymentDate}
+                  onChange={handleInputChange}
+                  className={`block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border ${
+                    errors.paymentDate ? 'border-red-300' : ''
+                  }`}
+                />
+                {errors.paymentDate && (
+                  <p className="mt-1 text-sm text-red-600">{errors.paymentDate}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Açıklama
+                </label>
+                <input
+                  type="text"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border"
+                  placeholder="Örn: Nakit ödeme, Banka transferi..."
+                />
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                disabled={isSubmitting}
+              >
+                İptal
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (editingPayment ? 'Güncelleniyor...' : 'Kaydediliyor...') : (editingPayment ? 'Güncelle' : 'Kaydet')}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   )
 }

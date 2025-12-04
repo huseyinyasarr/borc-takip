@@ -4,6 +4,7 @@ import jsPDF from 'jspdf'
 import { getUsers } from '../services/userService'
 import { getPurchases } from '../services/purchaseService'
 import { getCards } from '../services/cardService'
+import { getPaymentRecords } from '../services/paymentService'
 import {
   calculateUserTotalForMonth,
   calculateUserTotalDebt,
@@ -16,7 +17,7 @@ import {
   formatCurrency,
   formatDateLong
 } from '../utils/dateUtils'
-import { parseISO } from 'date-fns'
+import { parseISO, format } from 'date-fns'
 import MonthSelector from './MonthSelector'
 import UserColorBadge from './UserColorBadge'
 
@@ -33,6 +34,7 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
   const [selectedCard, setSelectedCard] = useState('all') // Kart filtresi
   const [cards, setCards] = useState([])
   const [showAllPurchasesInPdf, setShowAllPurchasesInPdf] = useState(false) // PDF'de tüm harcamaları göster
+  const [paymentRecords, setPaymentRecords] = useState([]) // Ödeme kayıtları
   const modalContentRef = useRef(null)
 
   useEffect(() => {
@@ -44,6 +46,12 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
       loadData()
     }
   }, [userId])
+
+  useEffect(() => {
+    if (userId && selectedMonth) {
+      loadPaymentRecords()
+    }
+  }, [userId, selectedMonth])
 
   const loadData = async () => {
     if (!userId) return
@@ -74,6 +82,18 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
       setLoading(false)
     }
   }
+
+  const loadPaymentRecords = async () => {
+    if (!userId || !selectedMonth) return
+    
+    try {
+      const records = await getPaymentRecords(userId, selectedMonth)
+      setPaymentRecords(records)
+    } catch (error) {
+      console.error('Ödeme kayıtları yüklenirken hata:', error)
+    }
+  }
+
 
   // Kullanıcının tüm unique mağazalarını (storeName) bul
   const uniqueStores = [...new Set(purchases.map((p) => p.storeName || p.description).filter(Boolean))].sort()
@@ -107,6 +127,10 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
     filteredPurchases,
     selectedMonth
   )
+
+  // Ödeme kayıtlarının toplamı
+  const totalPaidAmount = paymentRecords.reduce((sum, record) => sum + record.amount, 0)
+  const remainingDebt = monthTotal - totalPaidAmount
 
   // Her harcama için detaylı bilgi (filtrelenmiş harcamalara göre)
   const purchaseDetails = filteredPurchases.map((purchase) => {
@@ -491,17 +515,69 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
             ) : (
               <>
                 {/* Özet kartlar */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
                   <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                     <div className="text-sm font-medium text-gray-500">
                       Bu Ay Ödenecek
                     </div>
                     <div className="text-2xl font-bold text-gray-900 mt-2">
-                      {formatCurrency(monthTotal)}
+                      {formatCurrency(remainingDebt)}
                     </div>
+                    {totalPaidAmount > 0 && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        {formatCurrency(monthTotal)} - {formatCurrency(totalPaidAmount)} ödenen
+                      </div>
+                    )}
                     {thisMonthInstallmentCount > 0 && (
                       <div className="text-xs text-gray-500 mt-1">
                         {thisMonthInstallmentCount} harcamadan toplam
+                      </div>
+                    )}
+                  </div>
+                  <div className="bg-green-50 p-6 rounded-lg border border-green-200">
+                    <div className="text-sm font-medium text-green-700">Ödenen Tutar</div>
+                    <div className="text-2xl font-bold text-green-900 mt-2">
+                      {formatCurrency(totalPaidAmount)}
+                    </div>
+                    {paymentRecords.length > 0 && (
+                      <div className="text-xs text-green-600 mt-1">
+                        {paymentRecords.length} ödeme
+                      </div>
+                    )}
+                  </div>
+                  <div className={`p-6 rounded-lg border ${
+                    remainingDebt < 0 
+                      ? 'bg-green-50 border-green-200' 
+                      : remainingDebt === 0 
+                        ? 'bg-gray-50 border-gray-200' 
+                        : 'bg-orange-50 border-orange-200'
+                  }`}>
+                    <div className={`text-sm font-medium ${
+                      remainingDebt < 0 
+                        ? 'text-green-700' 
+                        : remainingDebt === 0 
+                          ? 'text-gray-500' 
+                          : 'text-orange-700'
+                    }`}>
+                      {remainingDebt < 0 ? 'Alacak' : 'Kalan Borç'}
+                    </div>
+                    <div className={`text-2xl font-bold mt-2 ${
+                      remainingDebt < 0 
+                        ? 'text-green-900' 
+                        : remainingDebt === 0 
+                          ? 'text-gray-900' 
+                          : 'text-orange-900'
+                    }`}>
+                      {formatCurrency(remainingDebt)}
+                    </div>
+                    {remainingDebt === 0 && totalPaidAmount > 0 && (
+                      <div className="text-xs text-green-600 mt-1 font-semibold">
+                        Tamamlandı ✓
+                      </div>
+                    )}
+                    {remainingDebt < 0 && (
+                      <div className="text-xs text-green-600 mt-1 font-semibold">
+                        Fazla ödeme yapıldı
                       </div>
                     )}
                   </div>
@@ -516,19 +592,6 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                     <div className="text-2xl font-bold text-gray-900 mt-2">
                       {remainingInstallments}
                     </div>
-                  </div>
-                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                    <div className="text-sm font-medium text-gray-500">Toplam Harcama</div>
-                    <div className="text-2xl font-bold text-gray-900 mt-2">
-                      {formatCurrency(
-                        filteredPurchases.reduce((sum, p) => sum + p.totalAmount, 0)
-                      )}
-                    </div>
-                    {selectedStore !== 'all' && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        {selectedStore} mağazasından
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -623,6 +686,83 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                               {formatCurrency(totalDebt)}
                             </td>
                           </tr>
+                          {/* Ödemeler */}
+                          {paymentRecords.length > 0 && (
+                            <>
+                              {paymentRecords.map((record) => (
+                                <tr key={record.id} className="bg-green-50">
+                                  <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-600 italic">
+                                    - {formatDateLong(record.paymentDate)}
+                                    {record.description && (
+                                      <span className="text-gray-500 ml-2">
+                                        ({record.description})
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-600">
+                                    -
+                                  </td>
+                                  <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-green-700">
+                                    -{formatCurrency(record.amount)}
+                                  </td>
+                                  <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-600">
+                                    -
+                                  </td>
+                                  <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-600">
+                                    -
+                                  </td>
+                                </tr>
+                              ))}
+                              <tr className="bg-green-50 border-t-2 border-green-300">
+                                <td className="px-6 py-3 whitespace-nowrap text-sm font-bold text-green-900">
+                                  TOPLAM ÖDENEN
+                                </td>
+                                <td className="px-6 py-3 whitespace-nowrap text-sm font-bold text-green-900">
+                                  -
+                                </td>
+                                <td className="px-6 py-3 whitespace-nowrap text-sm font-bold text-green-900">
+                                  -{formatCurrency(totalPaidAmount)}
+                                </td>
+                                <td className="px-6 py-3 whitespace-nowrap text-sm font-bold text-green-900">
+                                  -
+                                </td>
+                                <td className="px-6 py-3 whitespace-nowrap text-sm font-bold text-green-900">
+                                  -{formatCurrency(totalPaidAmount)}
+                                </td>
+                              </tr>
+                              <tr className={`border-t-2 ${
+                                remainingDebt < 0 
+                                  ? 'bg-green-50 border-green-300' 
+                                  : 'bg-orange-50 border-orange-300'
+                              }`}>
+                                <td className={`px-6 py-3 whitespace-nowrap text-sm font-bold ${
+                                  remainingDebt < 0 ? 'text-green-900' : 'text-orange-900'
+                                }`}>
+                                  {remainingDebt < 0 ? 'ALACAK' : 'KALAN BORÇ'}
+                                </td>
+                                <td className={`px-6 py-3 whitespace-nowrap text-sm font-bold ${
+                                  remainingDebt < 0 ? 'text-green-900' : 'text-orange-900'
+                                }`}>
+                                  -
+                                </td>
+                                <td className={`px-6 py-3 whitespace-nowrap text-sm font-bold ${
+                                  remainingDebt < 0 ? 'text-green-900' : 'text-orange-900'
+                                }`}>
+                                  {formatCurrency(remainingDebt)}
+                                </td>
+                                <td className={`px-6 py-3 whitespace-nowrap text-sm font-bold ${
+                                  remainingDebt < 0 ? 'text-green-900' : 'text-orange-900'
+                                }`}>
+                                  -
+                                </td>
+                                <td className={`px-6 py-3 whitespace-nowrap text-sm font-bold ${
+                                  remainingDebt < 0 ? 'text-green-900' : 'text-orange-900'
+                                }`}>
+                                  {formatCurrency(totalDebt - totalPaidAmount)}
+                                </td>
+                              </tr>
+                            </>
+                          )}
                         </tfoot>
                       </table>
                     </div>
