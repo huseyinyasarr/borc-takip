@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Authorization kontrolü
+    function isAuthorizedUser() {
+      return request.auth != null && request.auth.token.email == 'saadet6134@gmail.com';
+    }
+    
+    // Kullanıcılar koleksiyonu
+    match /users/{userId} {
+      allow read, write: if isAuthorizedUser();
+    }
+    
+    // Harcamalar koleksiyonu
+    match /purchases/{purchaseId} {
+      allow read, write: if isAuthorizedUser();
+    }
+    
+    // Ödemeler koleksiyonu
+    match /payments/{paymentId} {
+      allow read, write: if isAuthorizedUser();
+    }
+    
+    // Kartlar koleksiyonu
+    match /cards/{cardId} {
+      allow read, write: if isAuthorizedUser();
+    }
+  }
+}
+
