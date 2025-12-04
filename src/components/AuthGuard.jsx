@@ -97,11 +97,11 @@ const AuthGuard = ({ children }) => {
       } else if (error.code === 'auth/unauthorized-domain') {
         setError('Domain yetkilendirme hatası! Firebase Console ayarlarını kontrol edin.')
       } else if (error.code === 'auth/admin-restricted-operation') {
-        setError('Google Authentication aktif değil. Firebase Console\'dan Google provider\'ını aktifleştirin ve Authorized domains\'e localhost ekleyin.')
+        setError('Yetkiniz bulunmamaktadır. Lütfen yetkili bir email adresi ile giriş yapın.')
       } else if (error.code === 'auth/operation-not-allowed') {
         setError('Google sign-in method is not enabled. Please enable it in the Firebase Console.')
       } else {
-        setError('Giriş yapılırken bir hata oluştu: ' + (error.message || error.code))
+        setError('Giriş yapılırken bir hata oluştu: ')
       }
     }
   }
