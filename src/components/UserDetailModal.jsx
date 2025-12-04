@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
 import { getUsers } from '../services/userService'
 import { getPurchases } from '../services/purchaseService'
 import { getCards } from '../services/cardService'
@@ -31,6 +32,7 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
   const [selectedStore, setSelectedStore] = useState('all') // Mağaza filtresi
   const [selectedCard, setSelectedCard] = useState('all') // Kart filtresi
   const [cards, setCards] = useState([])
+  const [showAllPurchasesInPdf, setShowAllPurchasesInPdf] = useState(false) // PDF'de tüm harcamaları göster
   const modalContentRef = useRef(null)
 
   useEffect(() => {
@@ -184,12 +186,29 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
     }
   })
 
-  // Fotoğraf olarak export et
-  const handleExportAsImage = async () => {
+  // PDF olarak export et
+  const handleExportAsPdf = async () => {
     if (!modalContentRef.current || isExporting) return
 
     try {
       setIsExporting(true)
+      
+      // "Tüm Harcamalar Detayı" bölümünü bul ve geçici olarak gizle/göster
+      // Başlık metnini içeren tüm elementleri bul
+      const allHeadings = modalContentRef.current.querySelectorAll('h3')
+      let allPurchasesSection = null
+      for (const heading of allHeadings) {
+        if (heading.textContent.includes('Tüm Harcamalar Detayı')) {
+          // Parent container'ı bul (bg-white.border.border-gray-200.rounded-lg.overflow-hidden)
+          allPurchasesSection = heading.closest('.bg-white.border.border-gray-200.rounded-lg.overflow-hidden')
+          break
+        }
+      }
+      let originalAllPurchasesDisplay = ''
+      if (allPurchasesSection && !showAllPurchasesInPdf) {
+        originalAllPurchasesDisplay = allPurchasesSection.style.display
+        allPurchasesSection.style.display = 'none'
+      }
       
       // Orijinal stilleri kaydet
       const originalStyle = modalContentRef.current.style.cssText
@@ -222,7 +241,7 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
       const canvas = await html2canvas(modalContentRef.current, {
         width: 1920,
         height: fullHeight,
-        scale: 1,
+        scale: 2, // kaliteyi artır
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
@@ -244,29 +263,67 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
         contentDiv.style.overflow = originalContentOverflow
         contentDiv.style.maxHeight = ''
       }
+      
+      // "Tüm Harcamalar Detayı" bölümünü geri göster
+      if (allPurchasesSection && originalAllPurchasesDisplay !== undefined) {
+        allPurchasesSection.style.display = originalAllPurchasesDisplay
+      }
 
-      // Canvas'tan blob oluştur
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          setIsExporting(false)
-          return
+      const imgData = canvas.toDataURL('image/png')
+
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+
+      // Canvas boyutlarını al
+      const imgWidth = canvas.width
+      const imgHeight = canvas.height
+
+      // Resmin genişliğini sayfa genişliğine göre ölçekle
+      const imgWidthInMM = pageWidth
+      const imgHeightInMM = (imgHeight * pageWidth) / imgWidth
+
+      // Kaç sayfa gerektiğini hesapla
+      const totalPages = Math.ceil(imgHeightInMM / pageHeight)
+
+      // Her sayfa için resmin ilgili kısmını ekle
+      for (let page = 0; page < totalPages; page++) {
+        if (page > 0) {
+          pdf.addPage()
         }
 
-        // Dosya adını oluştur
-        const fileName = `${user?.name || 'Kullanici'}_${selectedMonth}_detay.png`
-
-        // İndirme linki oluştur ve tıkla
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = fileName
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        URL.revokeObjectURL(url)
+        // Bu sayfada gösterilecek resim yüksekliği (mm)
+        const remainingHeight = imgHeightInMM - (page * pageHeight)
+        const pageImgHeight = Math.min(pageHeight, remainingHeight)
         
-        setIsExporting(false)
-      }, 'image/png')
+        // Canvas'tan bu sayfanın görüntüsünü almak için yeni bir canvas oluştur
+        const pageCanvas = document.createElement('canvas')
+        const pageCtx = pageCanvas.getContext('2d')
+        
+        // Sayfa canvas boyutlarını ayarla
+        const pageCanvasHeight = Math.ceil((pageImgHeight / imgHeightInMM) * imgHeight)
+        pageCanvas.width = imgWidth
+        pageCanvas.height = pageCanvasHeight
+        
+        // Orijinal canvas'tan bu sayfanın kısmını çiz
+        const sourceY = Math.floor((page * pageHeight / imgHeightInMM) * imgHeight)
+        const sourceHeight = Math.min(pageCanvasHeight, imgHeight - sourceY)
+        
+        pageCtx.drawImage(
+          canvas,
+          0, sourceY, imgWidth, sourceHeight, // source rectangle
+          0, 0, imgWidth, pageCanvasHeight     // destination rectangle
+        )
+        
+        // Bu sayfa canvas'ını PDF'e ekle
+        const pageImgData = pageCanvas.toDataURL('image/png')
+        pdf.addImage(pageImgData, 'PNG', 0, 0, imgWidthInMM, pageImgHeight)
+      }
+
+      const fileName = `${user?.name || 'Kullanici'}_${selectedMonth}_detay.pdf`
+      pdf.save(fileName)
+
+      setIsExporting(false)
     } catch (error) {
       console.error('Fotoğraf export edilirken hata:', error)
       alert('Fotoğraf export edilirken bir hata oluştu.')
@@ -284,6 +341,19 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
         if (contentDiv) {
           contentDiv.style.overflow = ''
           contentDiv.style.maxHeight = ''
+        }
+        
+        // "Tüm Harcamalar Detayı" bölümünü geri göster
+        const allHeadings = modalContentRef.current.querySelectorAll('h3')
+        let allPurchasesSection = null
+        for (const heading of allHeadings) {
+          if (heading.textContent.includes('Tüm Harcamalar Detayı')) {
+            allPurchasesSection = heading.closest('.bg-white.border.border-gray-200.rounded-lg.overflow-hidden')
+            break
+          }
+        }
+        if (allPurchasesSection) {
+          allPurchasesSection.style.display = ''
         }
       }
     }
@@ -379,14 +449,25 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                   </select>
                 </div>
               )}
-              <button
-                onClick={handleExportAsImage}
-                disabled={isExporting}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Fotoğraf Olarak İndir"
-              >
-                {isExporting ? 'Export Ediliyor...' : 'Fotoğraf İndir'}
-              </button>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showAllPurchasesInPdf}
+                    onChange={(e) => setShowAllPurchasesInPdf(e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-xs">Tüm Harcamaları PDF'e Ekle</span>
+                </label>
+                <button
+                  onClick={handleExportAsPdf}
+                  disabled={isExporting}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="PDF İndir"
+                >
+                  {isExporting ? 'Export Ediliyor...' : 'PDF İndir'}
+                </button>
+              </div>
               <button
                 onClick={onClose}
                 className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
