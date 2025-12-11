@@ -6,16 +6,42 @@ export default defineConfig({
   plugins: [react()],
   // GitHub Pages için base path (production build'de kullanılacak)
   base: process.env.NODE_ENV === 'production' ? '/borc-takip/' : '/',
+  resolve: {
+    // Firebase paket çözümleme sorununu önlemek için
+    alias: {
+      // Firebase'in package.json exports sorununu çözmek için
+    },
+  },
+  optimizeDeps: {
+    // Firebase için optimize ayarları
+    include: ['firebase/app', 'firebase/firestore', 'firebase/auth'],
+    esbuildOptions: {
+      // Firebase için esbuild ayarları
+      target: 'es2020',
+    },
+  },
   build: {
     // Chunk size uyarısı için limit artırıldı
     chunkSizeWarningLimit: 1000,
+    commonjsOptions: {
+      // Firebase için CommonJS çözümleme ayarları
+      transformMixedEsModules: true,
+      defaultIsModuleInterop: true,
+    },
     rollupOptions: {
       output: {
         // Vendor chunk'ları ayır (daha iyi caching için)
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'firebase-vendor': ['firebase'],
-          'pdf-vendor': ['jspdf', 'html2canvas'],
+        // Firebase'i manuel chunk'tan çıkarıyoruz (paket çözümleme sorununu önlemek için)
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+              return 'react-vendor'
+            }
+            if (id.includes('jspdf') || id.includes('html2canvas')) {
+              return 'pdf-vendor'
+            }
+            // Firebase ve diğer paketler default chunk'ta kalacak
+          }
         },
       },
     },
