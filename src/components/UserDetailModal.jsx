@@ -239,10 +239,13 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
       const originalMaxHeight = modalContentRef.current.style.maxHeight
       const originalOverflow = modalContentRef.current.style.overflow
       
-      // Modal'ı geçici olarak 1920px genişliğe ayarla ve tüm içeriği göster
-      modalContentRef.current.style.width = '1920px'
-      modalContentRef.current.style.minWidth = '1920px'
-      modalContentRef.current.style.maxWidth = '1920px'
+      // PDF genişliği 1280px
+      const pdfWidth = 1280
+      
+      // Modal'ı geçici olarak optimize edilmiş genişliğe ayarla ve tüm içeriği göster
+      modalContentRef.current.style.width = `${pdfWidth}px`
+      modalContentRef.current.style.minWidth = `${pdfWidth}px`
+      modalContentRef.current.style.maxWidth = `${pdfWidth}px`
       modalContentRef.current.style.maxHeight = 'none' // Yükseklik kısıtlamasını kaldır
       modalContentRef.current.style.overflow = 'visible' // Overflow'u kaldır ki tüm içerik görünsün
       
@@ -261,17 +264,17 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
       // Tüm içeriğin yüksekliğini al
       const fullHeight = modalContentRef.current.scrollHeight
 
-      // Modal içeriğini yakala - tüm scroll edilen içeriği de dahil et
+      // Modal içeriğini yakala - optimize edilmiş ayarlarla
       const canvas = await html2canvas(modalContentRef.current, {
-        width: 1920,
+        width: pdfWidth,
         height: fullHeight,
-        scale: 2, // kaliteyi artır
+        scale: 1.5, // Kaliteyi optimize et (2 yerine 1.5 - dosya boyutunu azaltır)
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
         allowTaint: true,
         removeContainer: false,
-        windowWidth: 1920,
+        windowWidth: pdfWidth,
         windowHeight: fullHeight,
         scrollX: 0,
         scrollY: 0
@@ -293,7 +296,9 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
         allPurchasesSection.style.display = originalAllPurchasesDisplay
       }
 
-      const imgData = canvas.toDataURL('image/png')
+      // JPEG formatı kullan (PNG'den çok daha küçük dosya boyutu)
+      // Kalite: 0.85 (yüksek kalite ama küçük dosya)
+      const imgData = canvas.toDataURL('image/jpeg', 0.85)
 
       const pdf = new jsPDF('p', 'mm', 'a4')
       const pageWidth = pdf.internal.pageSize.getWidth()
@@ -339,9 +344,9 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
           0, 0, imgWidth, pageCanvasHeight     // destination rectangle
         )
         
-        // Bu sayfa canvas'ını PDF'e ekle
-        const pageImgData = pageCanvas.toDataURL('image/png')
-        pdf.addImage(pageImgData, 'PNG', 0, 0, imgWidthInMM, pageImgHeight)
+        // Bu sayfa canvas'ını PDF'e ekle (JPEG formatında)
+        const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.85)
+        pdf.addImage(pageImgData, 'JPEG', 0, 0, imgWidthInMM, pageImgHeight)
       }
 
       const fileName = `${user?.name || 'Kullanici'}_${selectedMonth}_detay.pdf`
