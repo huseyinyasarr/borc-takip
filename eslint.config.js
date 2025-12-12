@@ -2,6 +2,7 @@ import js from '@eslint/js'
 import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
+import globals from 'globals'
 
 export default [
   { ignores: ['dist'] },
@@ -10,10 +11,9 @@ export default [
     languageOptions: {
       ecmaVersion: 2020,
       globals: {
-        console: 'readonly',
-        window: 'readonly',
-        document: 'readonly',
-        alert: 'readonly'
+        ...globals.browser,
+        ...globals.node,
+        ...globals.es2021
       },
       parserOptions: {
         ecmaVersion: 'latest',
@@ -21,7 +21,7 @@ export default [
         sourceType: 'module'
       }
     },
-    settings: { react: { version: '18.3' } },
+    settings: { react: { version: '19.2' } },
     plugins: {
       react,
       'react-hooks': reactHooks,
@@ -33,11 +33,13 @@ export default [
       ...react.configs['jsx-runtime'].rules,
       ...reactHooks.configs.recommended.rules,
       'react/jsx-no-target-blank': 'off',
+      'react/prop-types': 'off', // TypeScript kullanılmadığı için PropTypes zorunluluğunu kaldırıyoruz
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true }
       ],
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }]
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'react/no-unescaped-entities': 'warn'
     }
   }
 ]
