@@ -25,7 +25,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22' # Node.js 22 LTS (Vite 7.x için gerekli minimum: 20.19+ veya 22.12+)
           cache: 'npm'
 
       - name: Install dependencies
