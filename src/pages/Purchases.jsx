@@ -35,6 +35,9 @@ const Purchases = () => {
   const [selectedUserForDetail, setSelectedUserForDetail] = useState(null)
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth())
   const [showPaymentForm, setShowPaymentForm] = useState(false)
+  const [purchasePage, setPurchasePage] = useState(1)
+  const [paymentPage, setPaymentPage] = useState(1)
+  const ITEMS_PER_PAGE = 20
   const formRef = useRef(null)
   const [formData, setFormData] = useState({
     userId: '',
@@ -53,6 +56,11 @@ const Purchases = () => {
   useEffect(() => {
     loadData()
   }, [])
+
+  useEffect(() => {
+    setPurchasePage(1)
+    setPaymentPage(1)
+  }, [filterUserId, filterCardId, filterDateFrom, filterDateTo, filterType])
 
   const loadData = async () => {
     setLoading(true)
@@ -763,7 +771,13 @@ const Purchases = () => {
       )}
 
       {/* Harcama Listesi */}
-      {(filterType === 'all' || filterType === 'purchases') && (
+      {(filterType === 'all' || filterType === 'purchases') && (() => {
+        const purchaseTotalPages = Math.ceil(filteredPurchases.length / ITEMS_PER_PAGE)
+        const paginatedPurchases = filteredPurchases.slice(
+          (purchasePage - 1) * ITEMS_PER_PAGE,
+          purchasePage * ITEMS_PER_PAGE
+        )
+        return (
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900">
@@ -795,7 +809,7 @@ const Purchases = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredPurchases.map((purchase) => {
+              {paginatedPurchases.map((purchase) => {
                 const user = getUser(purchase.userId)
                 const card = getCard(purchase.cardId)
                 return (
@@ -862,11 +876,65 @@ const Purchases = () => {
             </tbody>
             </table>
           </div>
+          {purchaseTotalPages > 1 && (
+            <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+              <div className="text-sm text-gray-500">
+                {filteredPurchases.length} kayıttan {(purchasePage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(purchasePage * ITEMS_PER_PAGE, filteredPurchases.length)} arası gösteriliyor
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPurchasePage((p) => Math.max(1, p - 1))}
+                  disabled={purchasePage === 1}
+                  className="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Önceki
+                </button>
+                {Array.from({ length: purchaseTotalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === purchaseTotalPages || Math.abs(p - purchasePage) <= 1)
+                  .reduce((acc, p, i, arr) => {
+                    if (i > 0 && p - arr[i - 1] > 1) acc.push('...')
+                    acc.push(p)
+                    return acc
+                  }, [])
+                  .map((item, i) =>
+                    item === '...' ? (
+                      <span key={`dots-${i}`} className="px-1 text-gray-400">...</span>
+                    ) : (
+                      <button
+                        key={item}
+                        onClick={() => setPurchasePage(item)}
+                        className={`px-3 py-1 text-sm rounded border ${
+                          purchasePage === item
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'border-gray-300 hover:bg-gray-100'
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  )}
+                <button
+                  onClick={() => setPurchasePage((p) => Math.min(purchaseTotalPages, p + 1))}
+                  disabled={purchasePage === purchaseTotalPages}
+                  className="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Sonraki
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+        )
+      })()}
 
       {/* Ödemeler Listesi */}
-      {(filterType === 'all' || filterType === 'payments') && (
+      {(filterType === 'all' || filterType === 'payments') && (() => {
+        const paymentTotalPages = Math.ceil(paymentRecords.length / ITEMS_PER_PAGE)
+        const paginatedPayments = paymentRecords.slice(
+          (paymentPage - 1) * ITEMS_PER_PAGE,
+          paymentPage * ITEMS_PER_PAGE
+        )
+        return (
         <div className={`bg-white shadow rounded-lg overflow-hidden ${(filterType === 'all' || filterType === 'purchases') ? 'mt-6' : ''}`}>
         <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">
@@ -901,7 +969,7 @@ const Purchases = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {paymentRecords.map((payment) => {
+              {paginatedPayments.map((payment) => {
                 const user = users.find((u) => u.id === payment.userId)
                 const paymentCard = payment.cardId ? cards.find((c) => c.id === payment.cardId) : null
                 return (
@@ -950,7 +1018,7 @@ const Purchases = () => {
                   </tr>
                 )
               })}
-              {paymentRecords.length === 0 && (
+              {paginatedPayments.length === 0 && (
                 <tr>
                   <td
                     colSpan="7"
@@ -963,8 +1031,56 @@ const Purchases = () => {
             </tbody>
           </table>
         </div>
+        {paymentTotalPages > 1 && (
+          <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+            <div className="text-sm text-gray-500">
+              {paymentRecords.length} kayıttan {(paymentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(paymentPage * ITEMS_PER_PAGE, paymentRecords.length)} arası gösteriliyor
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPaymentPage((p) => Math.max(1, p - 1))}
+                disabled={paymentPage === 1}
+                className="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Önceki
+              </button>
+              {Array.from({ length: paymentTotalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === paymentTotalPages || Math.abs(p - paymentPage) <= 1)
+                .reduce((acc, p, i, arr) => {
+                  if (i > 0 && p - arr[i - 1] > 1) acc.push('...')
+                  acc.push(p)
+                  return acc
+                }, [])
+                .map((item, i) =>
+                  item === '...' ? (
+                    <span key={`dots-${i}`} className="px-1 text-gray-400">...</span>
+                  ) : (
+                    <button
+                      key={item}
+                      onClick={() => setPaymentPage(item)}
+                      className={`px-3 py-1 text-sm rounded border ${
+                        paymentPage === item
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
+              <button
+                onClick={() => setPaymentPage((p) => Math.min(paymentTotalPages, p + 1))}
+                disabled={paymentPage === paymentTotalPages}
+                className="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Sonraki
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-      )}
+        )
+      })()}
 
       {/* Ödeme Ekleme/Düzenleme Modal */}
       {showPaymentForm && (
