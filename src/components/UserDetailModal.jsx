@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 import { getUsers } from '../services/userService'
@@ -34,8 +34,10 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
   const [selectedCard, setSelectedCard] = useState('all') // Kart filtresi
   const [cards, setCards] = useState([])
   const [showAllPurchasesInPdf, setShowAllPurchasesInPdf] = useState(false) // PDF'de tüm harcamaları göster
-  const [paymentRecords, setPaymentRecords] = useState([]) // Ödeme kayıtları
+  const [paymentRecords, setPaymentRecords] = useState([])
+  const [headerCollapsed, setHeaderCollapsed] = useState(false)
   const modalContentRef = useRef(null)
+  const contentScrollRef = useRef(null)
 
   useEffect(() => {
     setSelectedMonth(parentSelectedMonth)
@@ -94,6 +96,18 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
     }
   }
 
+  const handleContentScroll = useCallback(() => {
+    const el = contentScrollRef.current
+    if (!el) return
+    setHeaderCollapsed(el.scrollTop > 30)
+  }, [])
+
+  useEffect(() => {
+    const el = contentScrollRef.current
+    if (!el) return
+    el.addEventListener('scroll', handleContentScroll, { passive: true })
+    return () => el.removeEventListener('scroll', handleContentScroll)
+  }, [handleContentScroll])
 
   // Kullanıcının tüm unique mağazalarını (storeName) bul
   const uniqueStores = [...new Set(purchases.map((p) => p.storeName || p.description).filter(Boolean))].sort()
@@ -128,8 +142,13 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
     selectedMonth
   )
 
-  // Ödeme kayıtlarının toplamı
-  const totalPaidAmount = paymentRecords.reduce((sum, record) => sum + record.amount, 0)
+  // Ödeme kayıtlarını seçili karta göre filtrele
+  const filteredPaymentRecords = selectedCard === 'all'
+    ? paymentRecords
+    : paymentRecords.filter((record) => record.cardId === selectedCard)
+
+  // Ödeme kayıtlarının toplamı (filtrelenmiş)
+  const totalPaidAmount = filteredPaymentRecords.reduce((sum, record) => sum + record.amount, 0)
   const remainingDebt = monthTotal - totalPaidAmount
 
   // Her harcama için detaylı bilgi (filtrelenmiş harcamalara göre)
@@ -417,98 +436,134 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
         >
           {/* Header */}
           <div 
-            className="flex items-center justify-between px-6 py-4 border-b border-gray-200"
+            className="border-b border-gray-200 transition-all duration-300 ease-in-out shrink-0"
             style={{
               backgroundColor: hexToRgba(user?.color, 0.15)
             }}
           >
-            <div className="flex items-center gap-4">
-              {user && (
-                <h2 className="text-xl font-bold text-gray-900">
-                  <UserColorBadge color={user.color} name={user.name} />
-                </h2>
-              )}
-            </div>
-            <div className="flex flex-wrap items-end gap-4 justify-end">
-              {user && (
-                <div className="flex flex-col">
-                <MonthSelector
-                  value={selectedMonth}
-                  onChange={setSelectedMonth}
-                  label="Ekstre Ayı"
-                    wrapperClassName="mb-0 min-w-[180px]"
-                />
-                </div>
-              )}
-              {cards.length > 0 && (
-                <div className="flex flex-col">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Kart
-                  </label>
-                  <select
-                    value={selectedCard}
-                    onChange={(e) => setSelectedCard(e.target.value)}
-                    className="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm h-9 px-3 border min-w-[180px] leading-5 bg-white"
+            {/* Üst satır: İsim + Kapat (her zaman görünür) */}
+            <div className={`flex items-center justify-between px-6 transition-all duration-300 ${
+              headerCollapsed ? 'py-2 md:py-4' : 'py-4'
+            }`}>
+              <div className="flex items-center gap-4">
+                {user && (
+                  <h2 className={`font-bold text-gray-900 transition-all duration-300 ${
+                    headerCollapsed ? 'text-base md:text-xl' : 'text-xl'
+                  }`}>
+                    <UserColorBadge color={user.color} name={user.name} />
+                  </h2>
+                )}
+                {/* Collapsed durumda mobilde ay bilgisini göster */}
+                {headerCollapsed && (
+                  <span className="text-xs text-gray-500 md:hidden">
+                    {formatMonthDisplayLong(selectedMonth)}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Collapsed durumda mobilde PDF ve expand butonu */}
+                {headerCollapsed && (
+                  <button
+                    onClick={() => {
+                      const el = contentScrollRef.current
+                      if (el) el.scrollTo({ top: 0, behavior: 'smooth' })
+                    }}
+                    className="md:hidden text-gray-400 hover:text-gray-600 text-sm px-2 py-1 rounded border border-gray-300"
+                    aria-label="Filtreleri Göster"
                   >
-                    <option value="all">Tüm Kartlar</option>
-                    {cards.map((card) => (
-                      <option key={card.id} value={card.id}>
-                        {card.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              {uniqueStores.length > 0 && (
-                <div className="flex flex-col">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Mağaza
-                  </label>
-                  <select
-                    value={selectedStore}
-                    onChange={(e) => setSelectedStore(e.target.value)}
-                    className="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm h-9 px-3 border min-w-[180px] leading-5 bg-white"
-                  >
-                    <option value="all">Tüm Mağazalar</option>
-                    {uniqueStores.map((store) => (
-                      <option key={store} value={store}>
-                        {store}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div className="flex flex-col gap-2">
-                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showAllPurchasesInPdf}
-                    onChange={(e) => setShowAllPurchasesInPdf(e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-xs">Tüm Harcamaları PDF'e Ekle</span>
-                </label>
+                    Filtreler
+                  </button>
+                )}
                 <button
-                  onClick={handleExportAsPdf}
-                  disabled={isExporting}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label="PDF İndir"
+                  onClick={onClose}
+                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                  aria-label="Kapat"
                 >
-                  {isExporting ? 'Export Ediliyor...' : 'PDF İndir'}
+                  ×
                 </button>
               </div>
-              <button
-                onClick={onClose}
-                className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
-                aria-label="Kapat"
-              >
-                ×
-              </button>
+            </div>
+
+            {/* Filtreler ve butonlar: mobilde scroll'da gizlenir */}
+            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              headerCollapsed
+                ? 'max-h-0 opacity-0 md:max-h-[500px] md:opacity-100'
+                : 'max-h-[500px] opacity-100'
+            }`}>
+              <div className="flex flex-wrap items-end gap-4 justify-end px-6 pb-4">
+                {user && (
+                  <div className="flex flex-col">
+                  <MonthSelector
+                    value={selectedMonth}
+                    onChange={setSelectedMonth}
+                    label="Ekstre Ayı"
+                      wrapperClassName="mb-0 min-w-[180px]"
+                  />
+                  </div>
+                )}
+                {cards.length > 0 && (
+                  <div className="flex flex-col">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Kart
+                    </label>
+                    <select
+                      value={selectedCard}
+                      onChange={(e) => setSelectedCard(e.target.value)}
+                      className="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm h-9 px-3 border min-w-[180px] leading-5 bg-white"
+                    >
+                      <option value="all">Tüm Kartlar</option>
+                      {cards.map((card) => (
+                        <option key={card.id} value={card.id}>
+                          {card.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {uniqueStores.length > 0 && (
+                  <div className="flex flex-col">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Mağaza
+                    </label>
+                    <select
+                      value={selectedStore}
+                      onChange={(e) => setSelectedStore(e.target.value)}
+                      className="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm h-9 px-3 border min-w-[180px] leading-5 bg-white"
+                    >
+                      <option value="all">Tüm Mağazalar</option>
+                      {uniqueStores.map((store) => (
+                        <option key={store} value={store}>
+                          {store}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showAllPurchasesInPdf}
+                      onChange={(e) => setShowAllPurchasesInPdf(e.target.checked)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-xs">Tüm Harcamaları PDF'e Ekle</span>
+                  </label>
+                  <button
+                    onClick={handleExportAsPdf}
+                    disabled={isExporting}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label="PDF İndir"
+                  >
+                    {isExporting ? 'Export Ediliyor...' : 'PDF İndir'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div ref={contentScrollRef} className="flex-1 overflow-y-auto p-6">
             {loading ? (
               <div className="flex justify-center items-center h-64">
                 <div className="text-gray-500">Yükleniyor...</div>
@@ -520,7 +575,7 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
             ) : (
               <>
                 {/* Özet kartlar */}
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                     <div className="text-sm font-medium text-gray-500">
                       Bu Ay Ödenecek
@@ -544,45 +599,9 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                     <div className="text-2xl font-bold text-green-900 mt-2">
                       {formatCurrency(totalPaidAmount)}
                     </div>
-                    {paymentRecords.length > 0 && (
+                    {filteredPaymentRecords.length > 0 && (
                       <div className="text-xs text-green-600 mt-1">
-                        {paymentRecords.length} ödeme
-                      </div>
-                    )}
-                  </div>
-                  <div className={`p-6 rounded-lg border ${
-                    remainingDebt < 0 
-                      ? 'bg-green-50 border-green-200' 
-                      : remainingDebt === 0 
-                        ? 'bg-gray-50 border-gray-200' 
-                        : 'bg-orange-50 border-orange-200'
-                  }`}>
-                    <div className={`text-sm font-medium ${
-                      remainingDebt < 0 
-                        ? 'text-green-700' 
-                        : remainingDebt === 0 
-                          ? 'text-gray-500' 
-                          : 'text-orange-700'
-                    }`}>
-                      {remainingDebt < 0 ? 'Alacak' : 'Kalan Borç'}
-                    </div>
-                    <div className={`text-2xl font-bold mt-2 ${
-                      remainingDebt < 0 
-                        ? 'text-green-900' 
-                        : remainingDebt === 0 
-                          ? 'text-gray-900' 
-                          : 'text-orange-900'
-                    }`}>
-                      {formatCurrency(remainingDebt)}
-                    </div>
-                    {remainingDebt === 0 && totalPaidAmount > 0 && (
-                      <div className="text-xs text-green-600 mt-1 font-semibold">
-                        Tamamlandı ✓
-                      </div>
-                    )}
-                    {remainingDebt < 0 && (
-                      <div className="text-xs text-green-600 mt-1 font-semibold">
-                        Fazla ödeme yapıldı
+                        {filteredPaymentRecords.length} ödeme
                       </div>
                     )}
                   </div>
@@ -590,12 +609,6 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                     <div className="text-sm font-medium text-gray-500">Toplam Borç</div>
                     <div className="text-2xl font-bold text-gray-900 mt-2">
                       {formatCurrency(totalDebt)}
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                    <div className="text-sm font-medium text-gray-500">Kalan Taksit</div>
-                    <div className="text-2xl font-bold text-gray-900 mt-2">
-                      {remainingInstallments}
                     </div>
                   </div>
                 </div>
@@ -634,6 +647,9 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                               Kalan Taksit
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Son Ödeme Tarihi
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Kalan Tutar
                             </th>
                           </tr>
@@ -646,6 +662,17 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                             const detail = purchaseDetails.find(
                               (d) => d.id === installment.purchaseId
                             )
+
+                            const firstDate = detail?.firstDate || (
+                              typeof purchase?.firstInstallmentDate === 'string'
+                                ? new Date(purchase.firstInstallmentDate)
+                                : purchase?.firstInstallmentDate
+                            )
+                            const selectedYear = parseInt(selectedMonth.split('-')[0])
+                            const selectedMonthNum = parseInt(selectedMonth.split('-')[1]) - 1
+                            const day = firstDate ? firstDate.getDate() : 1
+                            const lastDayOfMonth = new Date(selectedYear, selectedMonthNum + 1, 0).getDate()
+                            const dueDate = new Date(selectedYear, selectedMonthNum, Math.min(day, lastDayOfMonth))
 
                             return (
                               <tr key={index} className="hover:bg-gray-50">
@@ -663,6 +690,9 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                                     ? detail.remainingInstallmentCount
                                     : installment.totalInstallments -
                                       installment.installmentNumber}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {formatDateLong(dueDate)}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                   {detail
@@ -688,16 +718,26 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                               -
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                              -
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                               {formatCurrency(totalDebt)}
                             </td>
                           </tr>
                           {/* Ödemeler */}
-                          {paymentRecords.length > 0 && (
+                          {filteredPaymentRecords.length > 0 && (
                             <>
-                              {paymentRecords.map((record) => (
+                              {filteredPaymentRecords.map((record) => {
+                                const recordCard = record.cardId ? cards.find((c) => c.id === record.cardId) : null
+                                return (
                                 <tr key={record.id} className="bg-green-50">
                                   <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-600 italic">
                                     - {formatDateLong(record.paymentDate)}
+                                    {recordCard && (
+                                      <span className="text-green-700 ml-2 font-medium">
+                                        [{recordCard.name}]
+                                      </span>
+                                    )}
                                     {record.description && (
                                       <span className="text-gray-500 ml-2">
                                         ({record.description})
@@ -716,8 +756,12 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                                   <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-600">
                                     -
                                   </td>
+                                  <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-600">
+                                    -
+                                  </td>
                                 </tr>
-                              ))}
+                                )
+                              })}
                               <tr className="bg-green-50 border-t-2 border-green-300">
                                 <td className="px-6 py-3 whitespace-nowrap text-sm font-bold text-green-900">
                                   TOPLAM ÖDENEN
@@ -727,6 +771,9 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                                 </td>
                                 <td className="px-6 py-3 whitespace-nowrap text-sm font-bold text-green-900">
                                   -{formatCurrency(totalPaidAmount)}
+                                </td>
+                                <td className="px-6 py-3 whitespace-nowrap text-sm font-bold text-green-900">
+                                  -
                                 </td>
                                 <td className="px-6 py-3 whitespace-nowrap text-sm font-bold text-green-900">
                                   -
@@ -754,6 +801,11 @@ const UserDetailModal = ({ userId, selectedMonth: parentSelectedMonth, onClose }
                                   remainingDebt < 0 ? 'text-green-900' : 'text-orange-900'
                                 }`}>
                                   {formatCurrency(remainingDebt)}
+                                </td>
+                                <td className={`px-6 py-3 whitespace-nowrap text-sm font-bold ${
+                                  remainingDebt < 0 ? 'text-green-900' : 'text-orange-900'
+                                }`}>
+                                  -
                                 </td>
                                 <td className={`px-6 py-3 whitespace-nowrap text-sm font-bold ${
                                   remainingDebt < 0 ? 'text-green-900' : 'text-orange-900'

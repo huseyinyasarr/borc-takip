@@ -174,6 +174,7 @@ export const createPaymentRecord = async (paymentData, logContext = {}) => {
       amount: parseFloat(paymentData.amount),
       paymentDate: paymentDateTimestamp,
       description: paymentData.description?.trim() || null,
+      cardId: paymentData.cardId || null,
       createdAt: Timestamp.now()
     })
 
@@ -219,6 +220,10 @@ export const updatePaymentRecord = async (paymentRecordId, paymentData, logConte
     
     if (paymentData.description !== undefined) {
       updateData.description = paymentData.description?.trim() || null
+    }
+
+    if (paymentData.cardId !== undefined) {
+      updateData.cardId = paymentData.cardId || null
     }
 
     updateData.updatedAt = Timestamp.now()

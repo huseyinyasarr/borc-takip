@@ -790,9 +790,6 @@ const Purchases = () => {
                   Taksit
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  İlk Taksit Tarihi
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   İşlemler
                 </th>
               </tr>
@@ -834,9 +831,6 @@ const Purchases = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatCurrency(getInstallmentAmount(purchase))} x{' '}
                       {purchase.installmentCount}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDateLong(purchase.firstInstallmentDate)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
@@ -887,6 +881,9 @@ const Purchases = () => {
                   Kullanıcı
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Kart
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Ekstre Ayı
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -906,6 +903,7 @@ const Purchases = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {paymentRecords.map((payment) => {
                 const user = users.find((u) => u.id === payment.userId)
+                const paymentCard = payment.cardId ? cards.find((c) => c.id === payment.cardId) : null
                 return (
                   <tr key={payment.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -917,6 +915,11 @@ const Purchases = () => {
                           <UserColorBadge color={user.color} name={user.name} />
                         </button>
                       )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {paymentCard ? (
+                        <CardColorBadge color={paymentCard.color} name={paymentCard.name} />
+                      ) : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {payment.month}
@@ -950,7 +953,7 @@ const Purchases = () => {
               {paymentRecords.length === 0 && (
                 <tr>
                   <td
-                    colSpan="6"
+                    colSpan="7"
                     className="px-6 py-4 text-center text-gray-500"
                   >
                     Ödeme kaydı bulunamadı
@@ -967,6 +970,7 @@ const Purchases = () => {
       {showPaymentForm && (
         <PaymentModal
           users={users}
+          cards={cards}
           selectedMonth={selectedMonth}
           editingPayment={editingPayment}
           onClose={() => {
@@ -996,9 +1000,10 @@ const Purchases = () => {
 /**
  * Ödeme Ekleme/Düzenleme Modal Component
  */
-const PaymentModal = ({ users, selectedMonth, editingPayment, onClose, onSave }) => {
+const PaymentModal = ({ users, cards = [], selectedMonth, editingPayment, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     userId: editingPayment?.userId || '',
+    cardId: editingPayment?.cardId || '',
     amount: editingPayment?.amount || '',
     paymentDate: editingPayment?.paymentDate 
       ? format(editingPayment.paymentDate, 'yyyy-MM-dd')
@@ -1013,6 +1018,7 @@ const PaymentModal = ({ users, selectedMonth, editingPayment, onClose, onSave })
     if (editingPayment) {
       setFormData({
         userId: editingPayment.userId,
+        cardId: editingPayment.cardId || '',
         amount: editingPayment.amount,
         paymentDate: format(editingPayment.paymentDate, 'yyyy-MM-dd'),
         description: editingPayment.description || '',
@@ -1021,6 +1027,7 @@ const PaymentModal = ({ users, selectedMonth, editingPayment, onClose, onSave })
     } else {
       setFormData({
         userId: '',
+        cardId: '',
         amount: '',
         paymentDate: format(new Date(), 'yyyy-MM-dd'),
         description: '',
@@ -1044,6 +1051,9 @@ const PaymentModal = ({ users, selectedMonth, editingPayment, onClose, onSave })
     if (!formData.userId) {
       newErrors.userId = 'Kullanıcı seçimi gereklidir'
     }
+    if (!formData.cardId) {
+      newErrors.cardId = 'Kart seçimi gereklidir'
+    }
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
       newErrors.amount = 'Geçerli bir tutar giriniz'
     }
@@ -1062,7 +1072,8 @@ const PaymentModal = ({ users, selectedMonth, editingPayment, onClose, onSave })
           await updatePaymentRecord(editingPayment.id, {
             amount: parseFloat(formData.amount),
             paymentDate: new Date(formData.paymentDate),
-            description: formData.description.trim() || null
+            description: formData.description.trim() || null,
+            cardId: formData.cardId || null
           })
           alert('Ödeme kaydı güncellendi')
         } else {
@@ -1071,7 +1082,8 @@ const PaymentModal = ({ users, selectedMonth, editingPayment, onClose, onSave })
             month: formData.month,
             amount: parseFloat(formData.amount),
             paymentDate: new Date(formData.paymentDate),
-            description: formData.description.trim() || null
+            description: formData.description.trim() || null,
+            cardId: formData.cardId || null
           })
           alert('Ödeme kaydı eklendi')
         }
@@ -1135,6 +1147,30 @@ const PaymentModal = ({ users, selectedMonth, editingPayment, onClose, onSave })
                 </select>
                 {errors.userId && (
                   <p className="mt-1 text-sm text-red-600">{errors.userId}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Kart <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="cardId"
+                  value={formData.cardId}
+                  onChange={handleInputChange}
+                  className={`block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border ${
+                    errors.cardId ? 'border-red-300' : ''
+                  }`}
+                >
+                  <option value="">Kart Seçin</option>
+                  {cards.map((card) => (
+                    <option key={card.id} value={card.id}>
+                      {card.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.cardId && (
+                  <p className="mt-1 text-sm text-red-600">{errors.cardId}</p>
                 )}
               </div>
 
